@@ -1,0 +1,7 @@
+name = "inkroom-app"
+main = "src/index.js"
+compatibility_date = "2024-03-11"
+[[d1_databases]]
+binding = "DB"
+database_name = "inkroom-db"
+database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
