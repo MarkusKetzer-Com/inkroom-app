@@ -2348,6 +2348,8 @@ app.get('/api/dashboard', async (c) => {
       for (var j = 0; j < jobKeys.length; j++) {
         jobsArr.push(press._jobs[jobKeys[j]]);
       }
+      // Sort by descending ID to ensure the newest job is first
+      jobsArr.sort(function(a, b) { return b.id - a.id; });
       // Only keep the current (most recent) job per press
       jobsArr = jobsArr.slice(0, 1);
       presses.push({
@@ -2477,6 +2479,11 @@ app.post('/api/jobs', async (c) => {
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
   try {
+    if (press_id) {
+      // Mark all existing active jobs for this press as completed
+      await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status = ?').bind('completed', press_id, 'active').run();
+    }
+
     const result = await db.prepare(
       `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id) VALUES (?, ?, ?, ?, ?)`
     ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null).run();
