@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  test_and_deploy:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,7 +18,15 @@ jobs:
           cache: 'npm'
       - name: Install Dependencies
         run: npm install
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: Run E2E Tests (Safe-Guard)
+        run: npm test
+
       - name: Deploy to Cloudflare
+        if: success()
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
