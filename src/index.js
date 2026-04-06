@@ -2914,6 +2914,49 @@ app.get('/api/dashboard', async (c) => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`).run();
 
+    // Ensure all required columns exist on jobs (handles pre-existing tables with old schema)
+    const jobsMeta = await db.prepare(`PRAGMA table_info(jobs)`).all();
+    const jobsColNames = (jobsMeta.results || []).map(r => r.name);
+    const requiredJobCols = [
+      { name: 'press_id', type: 'INTEGER' },
+      { name: 'color_count', type: 'INTEGER DEFAULT 0' },
+      { name: 'job_state', type: "TEXT DEFAULT 'ready'" },
+      { name: 'target_units', type: 'INTEGER DEFAULT 0' },
+      { name: 'curr_units', type: 'INTEGER DEFAULT 0' },
+      { name: 'actual_stops', type: 'INTEGER DEFAULT 0' },
+      { name: 'actual_waste', type: 'INTEGER DEFAULT 0' },
+      { name: 'setup_start_at', type: 'TEXT' },
+      { name: 'first_pull_at', type: 'TEXT' },
+      { name: 'prod_start_at', type: 'TEXT' },
+      { name: 'production_start_at', type: 'TEXT' },
+      { name: 'completed_at', type: 'TEXT' },
+      { name: 'prev_units', type: 'INTEGER DEFAULT 8' },
+    ];
+    for (const col of requiredJobCols) {
+      if (!jobsColNames.includes(col.name)) {
+        try { await db.prepare(`ALTER TABLE jobs ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
+      }
+    }
+
+    // Ensure all required columns exist on benchmarks
+    const bmMeta = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
+    const bmColNames = (bmMeta.results || []).map(r => r.name);
+    const requiredBmCols = [
+      { name: 'job_id', type: 'INTEGER' },
+      { name: 'color', type: 'TEXT' },
+      { name: 'color_hex', type: 'TEXT' },
+      { name: 'sctv_5', type: 'REAL' },
+      { name: 'sctv_10', type: 'REAL' },
+      { name: 'sctv_25', type: 'REAL' },
+      { name: 'sctv_50', type: 'REAL' },
+      { name: 'sctv_75', type: 'REAL' },
+    ];
+    for (const col of requiredBmCols) {
+      if (!bmColNames.includes(col.name)) {
+        try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
+      }
+    }
+
     const result = await db.prepare(`
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
