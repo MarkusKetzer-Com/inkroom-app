@@ -1,115 +1,4 @@
-import { Hono } from 'hono'
-import { renderJobCard, MetricsModalHTML, renderTimer, metricsModalLogic } from './ui-components.js'
-
-const app = new Hono()
-
-function evaluateColor(colorData, globalData) {
-    let de = Number(colorData.de) || 0;
-    let ds = Number(colorData.ds) || 0;
-    let delta_c = Number(colorData.delta_c) || 0;
-    let delta_h = Number(colorData.delta_h) || 0;
-    let delta_l = Number(colorData.delta_l) || 0;
-
-    let process_type = globalData.process_type || 'gravure';
-    let viscosity = (globalData.viscosity !== '' && globalData.viscosity !== null && globalData.viscosity !== undefined) ? Number(globalData.viscosity) : null;
-
-    let benchmark_en = '';
-    let benchmark_tr = '';
-    let status_en = '';
-    let status_tr = '';
-
-    if (de < 2.0 && ds >= 95 && ds <= 105) {
-        benchmark_en = 'Zero Pull';
-        benchmark_tr = 'Sıfır Çekim';
-        status_en = 'PASS';
-        status_tr = 'GEÇTİ';
-    } else if (de < 2.0 && ds >= 90 && ds <= 110) {
-        benchmark_en = 'In Tolerance';
-        benchmark_tr = 'Tolerans Dahilinde';
-        status_en = 'PASS';
-        status_tr = 'GEÇTİ';
-    } else if (ds < 86) {
-        benchmark_en = 'Transfer Issue';
-        benchmark_tr = 'Transfer Sorunu';
-        status_en = 'FAIL';
-        status_tr = 'KALDI';
-    } else {
-        benchmark_en = 'Fail';
-        benchmark_tr = 'Hatalı Performans';
-        status_en = 'FAIL';
-        status_tr = 'KALDI';
-    }
-
-    let diagnosis_en = "No action required";
-    let diagnosis_tr = "\u0130\u015flem gerekmez";
-
-    const isGravure = process_type === 'gravure';
-    const cylinderEN = isGravure ? 'cylinder' : 'anilox';
-    const cylinderTR = isGravure ? 'silindir' : 'anilox';
-    const cellEN = isGravure ? 'cell' : 'anilox';
-    const cellTR = isGravure ? 'hücre' : 'anilox';
-    const doctorEN = isGravure ? 'doctor blade' : 'chamber doctor blade';
-    const doctorTR = isGravure ? 'rakel' : 'hazne rakel';
-
-    const isViscosityHigh = viscosity !== null && viscosity > 27;
-    const isViscosityLow = viscosity !== null && viscosity < 17;
-
-    if (ds < 86) {
-        const overConc = delta_c > 3
-            ? (isGravure
-                ? ' · Additionally: ink over-concentrated — add extender before restart'
-                : ' · Additionally: ink over-concentrated — add extender')
-            : '';
-        const overConcTR = delta_c > 3
-            ? (isGravure
-                ? ' · Ayrıca: boya çok güçlü — yeniden başlamadan vernik ekle'
-                : ' · Ayrıca: boya çok güçlü — vernik ekle')
-            : '';
-        diagnosis_en = "Transfer Problem — ink not releasing from " + cellEN +
-            ". Check " + doctorEN + " pressure/angle · Lower viscosity · Check impression pressure · Inspect " + cylinderEN + " engraving" + overConc;
-        diagnosis_tr = "Transfer Sorunu — boya " + cellTR +
-            "den ayrılmıyor. " + doctorTR + " basıncı/açısı kontrol · Viskoziteyi düşür · Baskı basıncını kontrol · " + cylinderTR + " gravürünü incele" + overConcTR;
-    } else if (ds > 110) {
-        diagnosis_en = "Overdosing — " + cellEN + " volume too high or viscosity too low. Increase viscosity (add fresh ink) · Check " + cellEN + " volume · Reduce impression pressure";
-        diagnosis_tr = "Aşırı Dozaj — " + cellTR + " hacmi fazla veya viskozite çok düşük. Viskoziteyi artır (taze boya ekle) · " + cellTR + " hacmini kontrol et · Baskı basıncını azalt";
-    } else if (ds >= 86 && ds <= 95 && delta_c < 0 && Math.abs(delta_h) < 1.5) {
-        diagnosis_en = "Volume Issue — insufficient ink film. Lower viscosity · Check solvent ratio · Increase ink feed";
-        diagnosis_tr = "Miktar Sorunu — yetersiz boya filmi. Viskoziteyi düşür · Solvent oranını kontrol et · Boya beslemesini artır";
-    } else if (delta_c < -3 && delta_h > 1.5) {
-        diagnosis_en = "Contamination — foreign ink or solvent cross-contamination. Drain and clean ink pan · Check solvent supply lines · Inspect " + doctorEN + " for residue";
-        diagnosis_tr = "Kontaminasyon — yabancı boya veya solvent karışımı. Boya teknesini boşalt ve temizle · Solvent hatlarını kontrol et · " + doctorTR + " kalıntı için kontrol et";
-    } else if (delta_c < -3 && Math.abs(delta_h) <= 1.0 && ds >= 86 && ds <= 110) {
-        diagnosis_en = "Recipe Issue — pigment concentration low. Check viscosity · Add fresh base ink · Verify solvent evaporation rate";
-        diagnosis_tr = "Reçete Sorunu — pigment konsantrasyonu düşük. Viskoziteyi kontrol et · Taze boya ekle · Solvent buharlaşma hızını kontrol et";
-    } else if (delta_c > 3 && ds >= 86 && ds <= 110) {
-        diagnosis_en = "Recipe Issue — ink over-concentrated. Add extender/diluent · Increase solvent ratio · Check viscosity";
-        diagnosis_tr = "Reçete Sorunu — boya çok güçlü. Vernik/medyum ekle · Solvent oranını artır · Viskoziteyi kontrol et";
-    } else if (delta_h > 2.0 && delta_c < 2) {
-        diagnosis_en = "Hue Drift — solvent shift or pigment batch change. Compare ink batch · Check solvent ratio · Measure substrate OBA influence";
-        diagnosis_tr = "Ton Kayması — solvent değişimi veya pigment parti farkı. Boya partisini karşılaştır · Solvent oranını kontrol et · Substrat OBA etkisini ölç";
-    } else if (isGravure && isViscosityHigh && ds < 95) {
-        diagnosis_en = "Viscosity too high — solvent evaporation. Add solvent · Check drying temp · Reduce print speed if possible";
-        diagnosis_tr = "Viskozite çok yüksek — solvent buharlaşması. Solvent ekle · Kurutma sıcaklığını kontrol et · Mümkünse baskı hızını azalt";
-    } else if (isGravure && isViscosityLow && ds > 105) {
-        diagnosis_en = "Viscosity too low — over-diluted. Add fresh base ink · Let solvent partially evaporate · Do not add more solvent";
-        diagnosis_tr = "Viskozite çok düşük — aşırı inceltilmiş. Taze boya ekle · Solventin kısmen buharlaşmasına izin ver · Daha fazla solvent ekleme";
-    } else if (de >= 2.0) {
-        diagnosis_en = "General Deviation — check all parameters. Verify viscosity, print speed, drying temp, ink recipe and cylinder condition";
-        diagnosis_tr = "Genel Sapma — tüm parametreleri kontrol et. Viskozite, baskı hızı, kurutma sıcaklığı, boya reçetesi ve silindir durumunu kontrol et";
-    }
-
-    if (de < 2.0 && ds >= 95 && ds <= 105) {
-         diagnosis_en = "Ideal — Zero Pull. No action required";
-         diagnosis_tr = "\u0130deal — Sıfır Çekim. \u0130\u015flem gerekmez";
-    }
-
-    return { benchmark_en, benchmark_tr, status_en, status_tr, diagnosis_en, diagnosis_tr };
-}
-
-// ── Main SPA ───────────────────────────────────────────────────────────────
-app.get('/', (c) => {
-  c.header('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-  return c.html(`<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -302,19 +191,6 @@ app.get('/', (c) => {
     .badge-crit   { background: #fce8e8; color: #c62828; }
     .badge-neutral{ background: rgba(0,0,0,0.06); color: #86868b; }
 
-    /* Pulsing Timer */
-    @keyframes pulse {
-      0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.8; transform: scale(1.02); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-    .live-timer.pulsing {
-      display: inline-block;
-      animation: pulse 2s infinite ease-in-out;
-      color: var(--accent);
-      font-weight: 600;
-    }
-
     .card table { width: 100%; border-collapse: collapse; flex: 1; }
     .card th {
       text-align: left;
@@ -426,34 +302,6 @@ app.get('/', (c) => {
       letter-spacing: -0.01em;
     }
 
-    .cockpit-section {
-      padding: 16px 24px;
-      border-bottom: 0.5px solid var(--border-subtle);
-      background: rgba(0,0,0,0.015);
-    }
-    .meter-circle {
-      width: 38px; height: 38px;
-      border-radius: 50%;
-      background: conic-gradient(var(--meter-color, #1a7326) calc(var(--val) * 1%), rgba(0,0,0,0.06) 0);
-      display: flex; align-items: center; justify-content: center;
-      position: relative;
-    }
-    .meter-inner {
-      width: 30px; height: 30px;
-      border-radius: 50%;
-      background: var(--surface);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px; font-weight: 600; color: var(--meter-color, #1a7326);
-    }
-    .stop-icon {
-      position: relative;
-      display: flex; align-items: center; justify-content: center;
-      width: 24px; height: 24px;
-    }
-    .stop-val {
-      position: absolute;
-      font-size: 10px; font-weight: 700; color: #d84315;
-    }
     .progress-bar-wrap {
       padding: 0 24px 16px;
     }
@@ -1205,14 +1053,15 @@ app.get('/', (c) => {
           <label data-en="Product Name" data-tr="Urun Adi">Product Name</label>
           <input type="text" id="nj-title" placeholder="e.g. Coca-Cola Red Label">
         </div>
-        <div class="field">
-          <label data-en="Spot Colors" data-tr="Özel Renkler">Spot Colors</label>
-          <div id="nj-colors-container" style="display:flex; flex-direction:column; gap:8px;"></div>
-          <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="addJobColorEntry()" data-en="+ Add color" data-tr="+ Renk ekle">+ Add color</button>
-        </div>
-        <div class="field">
-          <label data-en="Target Quantity" data-tr="Hedef Miktarı">Target Quantity</label>
-          <input type="number" id="nj-target" placeholder="50000">
+        <div class="field-row">
+          <div class="field">
+            <label data-en="Total Colors" data-tr="Toplam Renk">Total Colors</label>
+            <input type="number" id="nj-count" placeholder="8">
+          </div>
+          <div class="field">
+            <label data-en="Target Quantity" data-tr="Hedef Miktarı">Target Quantity</label>
+            <input type="number" id="nj-target" placeholder="50000">
+          </div>
         </div>
         <div class="modal-actions">
           <button class="btn-ghost" onclick="closeNewJobModal()" data-en="Cancel" data-tr="Iptal">Cancel</button>
@@ -1371,7 +1220,37 @@ app.get('/', (c) => {
     </div>
   </div>
 
-  ${MetricsModalHTML}
+  
+  <div id="metrics-overlay" class="modal-overlay">
+    <div class="modal" style="max-width:340px;">
+      <div class="modal-head">
+        <span class="modal-title" id="metrics-title">Enter Metrics</span>
+        <button class="modal-close" onclick="closeMetricsModal()">X</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="metrics-job-id">
+        <div class="field">
+          <label data-en="Actual Units" data-tr="Gerçekleşen (Adet)">Actual Units</label>
+          <input type="number" id="metrics-actual" placeholder="0">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label data-en="Waste" data-tr="Makulatur">Waste</label>
+            <input type="number" id="metrics-waste" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-en="Stops" data-tr="Duruşlar">Stops</label>
+            <input type="number" id="metrics-stops" placeholder="0">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" onclick="closeMetricsModal()" data-en="Cancel" data-tr="Iptal">Cancel</button>
+          <button class="btn-primary" onclick="submitMetrics()" data-en="Update" data-tr="Güncelle">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Toast -->
   <div id="toast" class="toast"></div>
@@ -1487,8 +1366,8 @@ app.get('/', (c) => {
       var pillTV = pillLabels[tierTV] ? (currentLang === 'tr' ? pillLabels[tierTV].tr : pillLabels[tierTV].en) : '-';
       var pillDE = pillLabels[tierDE] ? (currentLang === 'tr' ? pillLabels[tierDE].tr : pillLabels[tierDE].en) : '-';
 
-      var safeColorName = (c.color_name || '').replace(/'/g, "\\'");
-      var safeHex = (hex || '').replace(/'/g, "\\'");
+      var safeColorName = (c.color_name || '').replace(/'/g, "\'");
+      var safeHex = (hex || '').replace(/'/g, "\'");
       var sctvData = JSON.stringify({
         sctv_5: c.sctv_5, sctv_10: c.sctv_10, sctv_25: c.sctv_25, sctv_50: c.sctv_50, sctv_75: c.sctv_75
       }).replace(/"/g, '&quot;');
@@ -1506,7 +1385,146 @@ app.get('/', (c) => {
     }
 
     // ── Render job tile (single active job, operator-focused) ───────────
-    ${renderJobCard}
+    
+    function renderJobCard(job) {
+      var measurements = job.measurements || [];
+      var deVals = measurements.map(function(m) { return Number(m.de); }).filter(function(v) { return !isNaN(v); });
+      var avgDe = deVals.length ? deVals.reduce(function(a, b) { return a + b; }, 0) / deVals.length : null;
+      var avgTier = getTier(avgDe);
+      var isTR = currentLang === 'tr';
+
+      var expectedColors = job.color_count || measurements.length || 0;
+      var measuredColors = measurements.length;
+      var progressPct = expectedColors > 0 ? Math.min(100, Math.round(measuredColors / expectedColors * 100)) : 0;
+
+      var failingColors = measurements.filter(function(m) { return Number(m.de) >= 2.0; });
+      var isZeroPull = measurements.length > 0 && failingColors.length === 0;
+
+      var deBadgeHtml = avgDe != null ? '<span class="badge badge-' + avgTier + '">avg dE ' + avgDe.toFixed(2) + '</span>' : '';
+      var colorWord = isTR ? 'renk' : (measurements.length === 1 ? 'color' : 'colors');
+      var colorCountBadge = measurements.length ? '<span class="badge badge-neutral">' + measuredColors + (expectedColors > measuredColors ? '/' + expectedColors : '') + ' ' + colorWord + '</span>' : '';
+
+      var tableHtml = '';
+      if (measurements.length === 0 && job.status === 'ready') {
+        tableHtml = '<div class="no-measurements">' + (isTR ? 'Hazırlık bekleniyor' : 'Waiting for setup') + '</div>';
+      } else {
+        tableHtml = '<div class="table-responsive"><table><thead><tr>' +
+          '<th>' + (isTR ? 'Renk' : 'Color') + '</th>' +
+          '<th>dE</th><th>D/S</th><th>dC*</th>' +
+          '<th>5%</th><th>10%</th><th>25%</th><th>50%</th><th>75%</th>' +
+          '<th title="Tone Value Status">' + (isTR ? 'Status TV' : 'Status TV') + '</th>' +
+          '<th title="Delta E Status">' + (isTR ? 'Status dE' : 'Status dE') + '</th>' +
+          '</tr></thead><tbody>';
+        measurements.forEach(function(m) { tableHtml += renderColorRow(m, job.id); });
+        tableHtml += '</tbody></table></div>';
+      }
+
+      var unitsTarget = job.target_units || 0;
+      var unitsActual = job.curr_units || 0;
+      var wasteTotal = job.actual_waste || 0;
+      var stopsTotal = job.actual_stops || 0;
+      var prodPct = unitsTarget > 0 ? Math.min(100, Math.round(unitsActual / unitsTarget * 100)) : 0;
+      var wastePct = unitsActual > 0 ? (wasteTotal / unitsActual * 100).toFixed(1) : '0.0';
+
+      // ── Benchmark Targets ─────────────────────────────────────────────────
+      var mechTargetMin = ((job.prev_units || 8) + (job.curr_units || 8)) * 2;
+
+      var tsToDate = function(ts) {
+        if (!ts) return null;
+        return new Date(ts.endsWith('Z') ? ts : ts + 'Z');
+      };
+      var msToMin = function(ms) { return ms / 60000; };
+
+      // ── Action Buttons & Timer Setup ──────────────────────────────────────
+      var actionBtnHtml = '';
+      var status = job.job_status || job.status || 'ready';
+      var startTime = null;
+      var timerPrefix = '';
+      var targetInfo = '';
+
+      if (status === 'ready') {
+        actionBtnHtml = '<button class="btn-action-main" onclick="handleJobAction(' + job.id + ', \'start-setup\')">▶ ' + (isTR ? 'Setup Başlat' : 'Start Setup') + '</button>';
+      } else if (status === 'setup') {
+        startTime = job.setup_start_at;
+        timerPrefix = 'Setup: ';
+        targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Ziel: ' + mechTargetMin + ' Min</span>';
+        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \'first-pull\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
+      } else if (status === 'andruck') {
+        startTime = job.first_pull_at;
+        timerPrefix = 'Andruck: ';
+        targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Admin-Ziel: 10 Min</span>';
+        actionBtnHtml = '<button class="btn-action-main state-andruck" onclick="handleJobAction(' + job.id + ', \'start-prod\')">⚡ ' + (isTR ? 'Üretimi Başlat' : 'Start Production') + '</button>';
+      } else if (status === 'active') {
+        startTime = job.prod_start_at;
+        timerPrefix = 'Prod: ';
+        actionBtnHtml = '<button class="btn-action-main state-active" onclick="openMetricsModal(' + job.id + ', \'' + escapeHtml(job.job_title || '') + '\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ')">📊 ' + (isTR ? 'Veri Gir' : 'Enter Metrics') + '</button>';
+        actionBtnHtml += '<button class="btn-action-sec" onclick="completeJob(' + job.id + ')">Finish</button>';
+      }
+
+      // ── Traffic-Light Badges (MECH / ADMIN / PROD) ────────────────────────
+      var bs = 'display:inline-block;font-size:9px;font-weight:700;letter-spacing:.04em;padding:2px 5px;border-radius:4px;margin-left:4px;';
+      var mechBadgeHtml = '', adminBadgeHtml = '', prodBadgeHtml = '';
+
+      if (status !== 'ready' && job.setup_start_at) {
+        var setupStart = tsToDate(job.setup_start_at);
+        var setupEnd = job.first_pull_at ? tsToDate(job.first_pull_at) : new Date();
+        var setupMin = msToMin(setupEnd - setupStart);
+        var mechOk = setupMin <= mechTargetMin;
+        mechBadgeHtml = '<span style="' + bs + 'background:' + (mechOk ? '#1a7326' : '#c62828') + ';color:#fff;" title="Setup: ' + Math.round(setupMin) + ' Min / Ziel: ' + mechTargetMin + ' Min">MECH</span>';
+      }
+
+      if ((status === 'andruck' || status === 'active') && job.first_pull_at) {
+        var fpStart = tsToDate(job.first_pull_at);
+        var fpEnd = job.prod_start_at ? tsToDate(job.prod_start_at) : new Date();
+        var adminMin = msToMin(fpEnd - fpStart);
+        var adminOk = stopsTotal <= 2 && wasteTotal <= 1000 && adminMin <= 20;
+        adminBadgeHtml = '<span style="' + bs + 'background:' + (adminOk ? '#1a7326' : '#c62828') + ';color:#fff;" title="Stopps: ' + stopsTotal + ', Mak: ' + wasteTotal + ', Zeit: ' + Math.round(adminMin) + ' Min">ADMIN</span>';
+      }
+
+      if (status === 'active' && job.prod_start_at) {
+        var prodStart = tsToDate(job.prod_start_at);
+        var prodMin = msToMin(new Date() - prodStart);
+        var speed = prodMin > 0 ? Math.round(unitsActual / prodMin) : 0;
+        var prodColor = speed >= 300 ? '#1a7326' : (speed >= 200 ? '#a35b00' : '#c62828');
+        prodBadgeHtml = '<span style="' + bs + 'background:' + prodColor + ';color:#fff;" title="Geschwindigkeit: ' + speed + ' m/min">PROD ' + (speed > 0 ? speed : '—') + '</span>';
+      }
+
+      var timerHtml = startTime ? '<span class="live-timer" data-start="' + startTime + '">00:00:00</span>' + targetInfo : '-';
+
+      return `<div class="card">
+        <div class="card-head">
+          <div class="job-id">${escapeHtml(job.job_number || '')}</div>
+          <div class="job-title">${escapeHtml(job.job_title || '')}</div>
+          <div class="badges">${deBadgeHtml}${colorCountBadge}${mechBadgeHtml}${adminBadgeHtml}${prodBadgeHtml}</div>
+        </div>
+        <div class="cockpit-section">
+          <div class="cockpit-grid">
+            <div class="cockpit-stat">
+              <span class="cockpit-label">${isTR ? 'Durum / Süre' : 'State / Duration'}</span>
+              <span class="cockpit-val">${timerPrefix}${timerHtml}</span>
+            </div>
+            <div class="cockpit-stat" style="text-align:right;">
+              <span class="cockpit-label">${isTR ? 'Üretim (Adet)' : 'Production (Units)'}</span>
+              <span class="cockpit-val">${unitsActual.toLocaleString()} / ${unitsTarget.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="cockpit-progress-bar"><div class="cockpit-progress-fill" style="width:${prodPct}%"></div></div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px;">
+             <div class="cockpit-stat"><span class="cockpit-label">${isTR ? 'Makulatur' : 'Waste'}</span><span class="cockpit-val" style="color:#d84315;">${wastePct}%</span></div>
+             <div class="cockpit-stat" style="text-align:right;"><span class="cockpit-label">${isTR ? 'Duruşlar' : 'Stops'}</span><span class="cockpit-val">${stopsTotal}</span></div>
+          </div>
+        </div>
+        ${tableHtml}
+        ${isZeroPull ? '<div class="zero-pull-banner">Zero Pull</div>' : ''}
+        <div class="action-btn-wrap">${actionBtnHtml}</div>
+        <div class="card-foot">
+          <a onclick="openJobDetail(${job.id})">${isTR ? 'Detaylar' : 'Details'}</a>
+          <span class="foot-sep">|</span>
+          <a onclick="openNewMeasurement(${job.id})">${isTR ? 'Ölçüm Ekle' : '+ Measurement'}</a>
+        </div>
+      </div>`;
+    }
+
 
     // ── Group flat dashboard rows into press->jobs->measurements ─────────
     function groupByPress(rows) {
@@ -1692,9 +1710,7 @@ app.get('/', (c) => {
       document.getElementById('nj-press-id').value = pressId || '';
       document.getElementById('nj-number').value = '';
       document.getElementById('nj-title').value = '';
-      var cont = document.getElementById('nj-colors-container');
-      if(cont) cont.innerHTML = '';
-      addJobColorEntry();
+      document.getElementById('nj-count').value = '';
       document.getElementById('nj-target').value = '';
       document.getElementById('new-job-overlay').classList.add('open');
       setTimeout(function() { document.getElementById('nj-number').focus(); }, 80);
@@ -1707,12 +1723,7 @@ app.get('/', (c) => {
     async function submitNewJob() {
       var job_number = document.getElementById('nj-number').value.trim();
       var job_title = document.getElementById('nj-title').value.trim();
-      var colors_arr = [];
-      var colorInputs = document.querySelectorAll('#nj-colors-container .nj-color-name');
-      for (var i = 0; i < colorInputs.length; i++) {
-        var val = colorInputs[i].value.trim();
-        if (val) colors_arr.push(val);
-      }
+      var color_count = parseInt(document.getElementById('nj-count').value) || 0;
       var target_units = parseInt(document.getElementById('nj-target').value) || 0;
       var press_id = parseInt(document.getElementById('nj-press-id').value) || null;
 
@@ -1725,7 +1736,7 @@ app.get('/', (c) => {
         var res = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_number: job_number, job_title: job_title, colors: colors_arr, color_count: colors_arr.length, press_id: press_id, target_units: target_units })
+          body: JSON.stringify({ job_number: job_number, job_title: job_title, color_count: color_count, press_id: press_id, target_units: target_units })
         });
         var data = await res.json();
         if (data.error) { showToast('Error: ' + data.error); return; }
@@ -1737,39 +1748,7 @@ app.get('/', (c) => {
       }
     }
 
-    function addJobColorEntry() {
-      var container = document.getElementById('nj-colors-container');
-      var entry = document.createElement('div');
-      entry.className = 'color-entry';
-      var colorLabel = currentLang === 'tr' ? 'Renk adi (örn. Cyan)' : 'Color name';
-      entry.innerHTML =
-        '<button class="remove-color-btn" onclick="removeJobColorEntry(this)" title="Remove">x</button>' +
-        '<div class="color-entry-head" style="margin-bottom:0;">' +
-          '<div style="flex:1;">' +
-            '<input type="text" list="pantone-list" class="nj-color-name" placeholder="' + colorLabel + '" style="width:100%;font-family:var(--font);font-size:14px;color:var(--text-primary);background:rgba(0,0,0,0.03);border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;padding:8px 12px;outline:none;">' +
-          '</div>' +
-        '</div>';
-
-      var nameInput = entry.querySelector('.nj-color-name');
-      nameInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addJobColorEntry();
-        }
-      });
-      container.appendChild(entry);
-      
-      if (container.children.length > 1) {
-        setTimeout(function() { nameInput.focus(); }, 20);
-      }
-    }
-
-    function removeJobColorEntry(btn) {
-      var container = document.getElementById('nj-colors-container');
-      btn.closest('.color-entry').remove();
-    }
-
-    // ── New Measurement modal (deprecated/legacy fallback) ────────────────
+    // ── New Measurement modal ─────────────────────────────────────────────
     function openNewMeasurement(jobId) {
       currentMeasJobId = jobId;
       var jobTitle = (jobsLookup[jobId] && jobsLookup[jobId].job_title) || '';
@@ -1942,73 +1921,6 @@ app.get('/', (c) => {
 
         var html = '';
 
-        var tsToDate = function(ts) { return new Date(ts + (ts.endsWith('Z')?'':'Z')); };
-        var msToMin = function(ms) { return Math.max(0, ms / 1000 / 60); };
-
-        var status = job.job_state || 'ready';
-        var cc = job.color_count || 0;
-        var targetMin = cc * 2;
-        
-        var mechHtml = '';
-        if (status !== 'ready' && job.setup_start_at) {
-          var setupStart = tsToDate(job.setup_start_at);
-          var setupEnd = job.first_pull_at ? tsToDate(job.first_pull_at) : new Date();
-          var mechMin = msToMin(setupEnd - setupStart);
-          var mechDiff = Math.round(mechMin - targetMin);
-          var isMechOk = mechDiff <= 0;
-          var mechText = isMechOk ? 'OK (' + Math.round(mechMin) + ' Min)' : '+' + mechDiff + ' Min Delay';
-          mechHtml = '<div style="flex:1; background:' + (isMechOk ? '#e8f5e9' : '#ffebee') + '; border:1px solid ' + (isMechOk ? '#a5d6a7' : '#ef9a9a') + '; border-radius:8px; padding:12px;">' +
-            '<div style="font-size:10px; font-weight:600; color:' + (isMechOk ? '#2e7d32' : '#c62828') + '; margin-bottom:4px;">MECH SETUP</div>' +
-            '<div style="font-size:14px; font-weight:700; color:' + (isMechOk ? '#1b5e20' : '#b71c1c') + ';">' + mechText + '</div></div>';
-        } else {
-          mechHtml = '<div style="flex:1; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px; opacity:0.6;">' +
-            '<div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">MECH SETUP</div>' +
-            '<div style="font-size:14px; font-weight:700; color:var(--text-primary);">-</div></div>';
-        }
-
-        var adminHtml = '';
-        var stops = job.actual_stops || 0;
-        var waste = job.actual_waste || 0;
-        if ((status === 'andruck' || status === 'active' || status === 'completed') && job.first_pull_at) {
-          var fpStart = tsToDate(job.first_pull_at);
-          var fpEnd = job.production_start_at ? tsToDate(job.production_start_at) : new Date();
-          var adminMin = msToMin(fpEnd - fpStart);
-          var adminOk = stops <= 2 && waste <= 1000 && adminMin <= 20;
-          var devText = [];
-          if (adminMin > 20) devText.push('+' + Math.round(adminMin - 20) + ' Min');
-          if (stops > 2) devText.push('+' + (stops - 2) + ' Stops');
-          if (waste > 1000) devText.push('+' + (waste - 1000) + 'm Waste');
-          var adminText = adminOk ? 'OK (' + Math.round(adminMin) + 'm)' : devText.join(', ');
-          
-          adminHtml = '<div style="flex:1; background:' + (adminOk ? '#e8f5e9' : '#ffebee') + '; border:1px solid ' + (adminOk ? '#a5d6a7' : '#ef9a9a') + '; border-radius:8px; padding:12px;">' +
-            '<div style="font-size:10px; font-weight:600; color:' + (adminOk ? '#2e7d32' : '#c62828') + '; margin-bottom:4px;">ADMIN (ANDRUCK)</div>' +
-            '<div style="font-size:13px; font-weight:700; color:' + (adminOk ? '#1b5e20' : '#b71c1c') + ';">' + adminText + '</div></div>';
-        } else {
-          adminHtml = '<div style="flex:1; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px; opacity:0.6;">' +
-            '<div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">ADMIN (ANDRUCK)</div>' +
-            '<div style="font-size:14px; font-weight:700; color:var(--text-primary);">-</div></div>';
-        }
-
-        var prodHtml = '';
-        var units = job.curr_units || 0;
-        // production target speeds
-        if ((status === 'active' || status === 'completed') && job.production_start_at) {
-          var pStart = tsToDate(job.production_start_at);
-          var pEnd = job.completed_at ? tsToDate(job.completed_at) : new Date();
-          var pMin = msToMin(pEnd - pStart);
-          var speed = pMin > 0 ? Math.round(units / pMin) : 0;
-          var speedOk = speed >= 300;
-          prodHtml = '<div style="flex:1; background:' + (speedOk ? '#e8f5e9' : (speed >= 200 ? '#fff3e0' : '#ffebee')) + '; border:1px solid ' + (speedOk ? '#a5d6a7' : (speed >= 200 ? '#ffcc80' : '#ef9a9a')) + '; border-radius:8px; padding:12px;">' +
-            '<div style="font-size:10px; font-weight:600; color:' + (speedOk ? '#2e7d32' : (speed >= 200 ? '#e65100' : '#c62828')) + '; margin-bottom:4px;">PROD SPEED</div>' +
-            '<div style="font-size:14px; font-weight:700; color:' + (speedOk ? '#1b5e20' : (speed >= 200 ? '#e65100' : '#b71c1c')) + ';">' + speed + ' m/min</div></div>';
-        } else {
-          prodHtml = '<div style="flex:1; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px; opacity:0.6;">' +
-            '<div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">PROD SPEED</div>' +
-            '<div style="font-size:14px; font-weight:700; color:var(--text-primary);">-</div></div>';
-        }
-
-        html += '<div style="display:flex; gap:12px; margin:16px;">' + mechHtml + adminHtml + prodHtml + '</div>';
-
         if (colorOrder.length === 0) {
           html += '<p style="color:var(--text-tertiary);font-size:13px;padding:20px 0;">' + (currentLang === 'tr' ? 'Henuz olcum yok.' : 'No measurements yet.') + '</p>';
         } else {
@@ -2019,12 +1931,7 @@ app.get('/', (c) => {
             for (var ri = rows.length - 1; ri >= 0; ri--) { if (rows[ri].color_hex) { lastHex = rows[ri].color_hex; break; } }
 
             html += '<div class="detail-color-group">';
-            html += '<div class="detail-color-name" style="display:flex; justify-content:space-between; align-items:center;">' +
-                    '<div><span class="swatch" style="background:' + lastHex + '"></span>' + escapeHtml(colorName) + '</div>' +
-                    '<div style="font-weight:normal;">' +
-                      '<a onclick="renameJobColor(' + jobId + ', &quot;' + escapeHtml(colorName) + '&quot;)" style="cursor:pointer; margin-right:16px; font-size:14px; opacity:0.6;" title="' + (currentLang === 'tr' ? 'Düzenle' : 'Edit') + '">✏️</a>' +
-                      '<a onclick="deleteJobColor(' + jobId + ', &quot;' + escapeHtml(colorName) + '&quot;)" style="cursor:pointer; font-size:14px; opacity:0.6;" title="' + (currentLang === 'tr' ? 'Sil' : 'Delete') + '">🗑️</a>' +
-                    '</div></div>';
+            html += '<div class="detail-color-name"><span class="swatch" style="background:' + lastHex + '"></span>' + escapeHtml(colorName) + '</div>';
             html += '<table class="detail-table"><thead><tr>';
             html += '<th>#</th><th>dE</th><th>D/S</th><th>dC*</th>';
             html += '<th>' + (currentLang === 'tr' ? 'Durum' : 'Status') + '</th>';
@@ -2237,8 +2144,95 @@ app.get('/', (c) => {
     document.getElementById('metrics-overlay').addEventListener('click', function(e) { if (e.target === e.currentTarget) closeMetricsModal(); });
 
     // ── Metrics Modal ────────────────────────────────────────────────────────
-    ${renderTimer}
-    ${metricsModalLogic}
+    
+    function renderTimer() {
+      document.querySelectorAll('.live-timer').forEach(function(el) {
+        var startStr = el.getAttribute('data-start');
+        if (!startStr) return;
+        var start = new Date(startStr.endsWith('Z') ? startStr : startStr + 'Z');
+        var now = new Date();
+        var diff = Math.floor((now - start) / 1000);
+        if (diff < 0) diff = 0;
+        var h = Math.floor(diff / 3600);
+        var m = Math.floor((diff % 3600) / 60);
+        var s = diff % 60;
+        el.textContent = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      });
+    }
+    setInterval(renderTimer, 1000);
+
+    
+    function openMetricsModal(jobId, title, actual, waste, stops) {
+      document.getElementById('metrics-job-id').value = jobId;
+      document.getElementById('metrics-title').textContent = (currentLang === 'tr' ? 'Veri Gir: ' : 'Metrics: ') + title;
+      document.getElementById('metrics-actual').value = actual || '';
+      document.getElementById('metrics-waste').value = waste || '';
+      document.getElementById('metrics-stops').value = stops || '';
+      document.getElementById('metrics-overlay').classList.add('open');
+      setTimeout(function() { document.getElementById('metrics-actual').focus(); }, 80);
+    }
+
+    function closeMetricsModal() {
+      document.getElementById('metrics-overlay').classList.remove('open');
+    }
+
+    async function submitMetrics() {
+      var id = document.getElementById('metrics-job-id').value;
+      var actual = parseInt(document.getElementById('metrics-actual').value) || 0;
+      var waste = parseInt(document.getElementById('metrics-waste').value) || 0;
+      var stops = parseInt(document.getElementById('metrics-stops').value) || 0;
+      try {
+        var res = await fetch('/api/jobs/' + id + '/performance', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stops: stops, waste: waste, units: actual })
+        });
+        if (res.ok) {
+          closeMetricsModal();
+          showToast(currentLang === 'tr' ? 'Veriler güncellendi' : 'Metrics updated');
+          if (typeof loadDashboard === 'function') loadDashboard();
+        }
+      } catch(e) { showToast('Error updating metrics'); }
+    }
+
+    async function handleJobAction(id, action) {
+      try {
+        var res = await fetch('/api/jobs/' + id + '/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action })
+        });
+        if (res.ok) {
+          showToast(currentLang === 'tr' ? 'İşlem başarılı' : 'Action successful');
+          if (typeof loadDashboard === 'function') loadDashboard();
+        }
+      } catch(e) { showToast('Action failed'); }
+    }
+
+    async function completeJob(id) {
+       if (!confirm(currentLang === 'tr' ? 'İşi bitirmek istediğinize emin misiniz?' : 'Are you sure you want to finish this job?')) return;
+       try {
+         var res = await fetch('/api/jobs/' + id, {
+           method: 'PUT',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ status: 'completed' })
+         });
+         if (res.ok) {
+           showToast(currentLang === 'tr' ? 'İş tamamlandı' : 'Job completed');
+           if (typeof loadDashboard === 'function') loadDashboard();
+         }
+       } catch(e) { showToast('Failed to complete job'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var overlay = document.getElementById('metrics-overlay');
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === e.currentTarget) closeMetricsModal();
+        });
+      }
+    });
+
 
     // ── Escape closes modals ─────────────────────────────────────────────
     document.addEventListener('keydown', function(e) {
@@ -2613,1139 +2607,10 @@ app.get('/', (c) => {
       }
     }
 
-    // ── Color Management inside Details ───────────────────────────────
-    async function renameJobColor(jobId, oldColorName) {
-      var newColorName = prompt(currentLang === 'tr' ? 'Yeni renk adını girin:' : 'Enter new color name:', oldColorName);
-      if (!newColorName || newColorName.trim() === '' || newColorName === oldColorName) return;
-      try {
-        var res = await fetch('/api/jobs/' + jobId + '/colors/' + encodeURIComponent(oldColorName), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ new_color: newColorName.trim() })
-        });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Renk adı güncellendi' : 'Color updated');
-          openJobDetail(jobId);
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error updating color');
-      }
-    }
-
-    async function deleteJobColor(jobId, colorName) {
-      if (!confirm(currentLang === 'tr' ? 'Bu rengi ve tüm ölçümlerini silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this color and ALL its measurements permanently?')) return;
-      try {
-        var res = await fetch('/api/jobs/' + jobId + '/colors/' + encodeURIComponent(colorName), {
-          method: 'DELETE'
-        });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Renk silindi' : 'Color deleted');
-          openJobDetail(jobId);
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error deleting color');
-      }
-    }
-
     // ── Init ─────────────────────────────────────────────────────────────
-    async function updateJobUnits(jobId, currentUnits, currentWaste, currentStops) {
-      var newUnitsVal = prompt(currentLang === 'tr' ? 'Yeni üretim miktarı (m):' : 'Update production units (m):', currentUnits || 0);
-      if (newUnitsVal === null) return;
-      var newUnits = parseInt(newUnitsVal, 10);
-      if (isNaN(newUnits) || newUnits < 0) {
-        showToast(currentLang === 'tr' ? 'Geçersiz değer.' : 'Invalid number.');
-        return;
-      }
-      try {
-        var payload = { units: newUnits, waste: currentWaste || 0, stops: currentStops || 0 };
-        var res = await fetch('/api/jobs/' + jobId + '/performance', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Üretim miktarı güncellendi.' : 'Production units updated.');
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error updating units');
-      }
-    }
-
     applyLang(currentLang);
     loadDashboard();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </body>
-</html>`)
-})
-
-// ── DB Migration (enhanced) ────────────────────────────────────────────────
-app.get('/api/migrate', async (c) => {
-  const db = c.env.DB;
-  const log = [];
-  try {
-    // 1. Create presses table
-    await db.prepare(`CREATE TABLE IF NOT EXISTS presses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      machine TEXT,
-      max_colors INTEGER DEFAULT 8,
-      status TEXT DEFAULT 'idle',
-      sort_order INTEGER DEFAULT 0
-    )`).run();
-    log.push('presses table ensured');
-
-    // 2. Seed presses if empty
-    const pressCount = await db.prepare(`SELECT COUNT(*) as cnt FROM presses`).first();
-    if (pressCount.cnt === 0) {
-      await db.batch([
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 1', 'Rotogravure 1', 8, 'idle', 1)`),
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 2', 'Rotogravure 2', 8, 'idle', 2)`),
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 3', 'Rotogravure 3', 10, 'idle', 3)`)
-      ]);
-      log.push('seeded Roto 1/2/3');
-    }
-
-    // 3. Create jobs table
-    await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_number TEXT NOT NULL UNIQUE,
-      job_title TEXT NOT NULL,
-      print_method TEXT,
-      color_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'active',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-    log.push('jobs table ensured');
-
-    // 4. Add performance columns to jobs if missing
-    const jobsInfo = await db.prepare(`PRAGMA table_info(jobs)`).all();
-    const jobsCols = (jobsInfo.results || []).map(r => r.name);
-    
-    const performanceCols = [
-      { name: 'press_id', type: 'INTEGER' },
-      { name: 'setup_start_at', type: 'TEXT' },
-      { name: 'first_pull_at', type: 'TEXT' },
-      { name: 'prod_start_at', type: 'TEXT' },
-      { name: 'prev_units', type: 'INTEGER DEFAULT 8' },
-      { name: 'curr_units', type: 'INTEGER DEFAULT 8' },
-      { name: 'target_units', type: 'INTEGER DEFAULT 0' },
-      { name: 'actual_stops', type: 'INTEGER' },
-      { name: 'actual_waste', type: 'INTEGER' }
-    ];
-
-    for (const col of performanceCols) {
-      if (!jobsCols.includes(col.name)) {
-        await db.prepare(`ALTER TABLE jobs ADD COLUMN ${col.name} ${col.type}`).run();
-        log.push(`added ${col.name} to jobs`);
-      }
-    }
-
-    // 5. Add missing columns to benchmarks
-    const tableInfo = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
-    const cols = (tableInfo.results || []).map(r => r.name);
-
-    if (!cols.includes('job_id')) {
-      await db.prepare(`ALTER TABLE benchmarks ADD COLUMN job_id INTEGER`).run();
-      log.push('added job_id column');
-    }
-    if (!cols.includes('color_hex')) {
-      await db.prepare(`ALTER TABLE benchmarks ADD COLUMN color_hex TEXT`).run();
-      log.push('added color_hex column');
-    }
-    if (!cols.includes('measurement_seq')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN measurement_seq INTEGER DEFAULT 1').run(); log.push('added measurement_seq column'); } catch(e) {}
-    }
-    if (!cols.includes('edited_at')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN edited_at TEXT').run(); log.push('added edited_at column'); } catch(e) {}
-    }
-    if (!cols.includes('edited_from')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN edited_from TEXT').run(); log.push('added edited_from column'); } catch(e) {}
-    }
-
-    // 6. Auto-create jobs from existing product groups (only for unlinked rows)
-    const colorCol = cols.includes('color') ? 'color' : 'color_name';
-    const unlinked = await db.prepare(`SELECT DISTINCT product FROM benchmarks WHERE job_id IS NULL AND product IS NOT NULL`).all();
-    const products = unlinked.results || [];
-    log.push('found ' + products.length + ' unlinked product groups');
-
-    for (const row of products) {
-      const productName = row.product;
-      const existing = await db.prepare(`SELECT id FROM jobs WHERE job_title = ?`).bind(productName).first();
-      let jobId;
-      if (existing) {
-        jobId = existing.id;
-        log.push('reusing job #' + jobId + ' for "' + productName + '"');
-      } else {
-        const jobNum = 'AUTO-' + productName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
-        try {
-          const ins = await db.prepare(
-            `INSERT INTO jobs (job_number, job_title, print_method, color_count) VALUES (?, ?, 'Gravure', 0)`
-          ).bind(jobNum, productName).run();
-          jobId = ins.meta.last_row_id;
-          log.push('created job #' + jobId + ' "' + productName + '"');
-        } catch(e) {
-          const fallback = await db.prepare(`SELECT id FROM jobs WHERE job_number = ?`).bind(jobNum).first();
-          jobId = fallback ? fallback.id : null;
-          log.push('job_number conflict for "' + jobNum + '", reusing #' + jobId);
-        }
-      }
-
-      if (jobId) {
-        await db.prepare(`UPDATE benchmarks SET job_id = ? WHERE product = ? AND job_id IS NULL`).bind(jobId, productName).run();
-        const countResult = await db.prepare(`SELECT COUNT(DISTINCT ${colorCol}) as cnt FROM benchmarks WHERE job_id = ?`).bind(jobId).first();
-        await db.prepare(`UPDATE jobs SET color_count = ? WHERE id = ?`).bind(countResult ? countResult.cnt : 0, jobId).run();
-        log.push('linked benchmarks for "' + productName + '" to job #' + jobId);
-      }
-    }
-
-    // 7. Assign all existing jobs without press_id to Roto 1 (the first press)
-    const firstPress = await db.prepare(`SELECT id FROM presses ORDER BY sort_order ASC LIMIT 1`).first();
-    if (firstPress) {
-      await db.prepare(`UPDATE jobs SET press_id = ? WHERE press_id IS NULL`).bind(firstPress.id).run();
-      log.push('assigned unlinked jobs to press #' + firstPress.id + ' (Roto 1)');
-    }
-
-    // 8. Create performance indexes (IF NOT EXISTS is idempotent)
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_job_id ON benchmarks(job_id)`).run();
-      log.push('index: benchmarks.job_id');
-    } catch(e) { log.push('index benchmarks.job_id skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_job_created ON benchmarks(job_id, created_at)`).run();
-      log.push('index: benchmarks(job_id, created_at)');
-    } catch(e) { log.push('index benchmarks.job_created skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_seq ON benchmarks(measurement_seq)`).run();
-      log.push('index: benchmarks.measurement_seq');
-    } catch(e) { log.push('index benchmarks.seq skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_jobs_press_status ON jobs(press_id, status)`).run();
-      log.push('index: jobs(press_id, status)');
-    } catch(e) { log.push('index jobs.press_status skip: ' + e.message); }
-
-    return c.json({ ok: true, log });
-  } catch(e) {
-    return c.json({ ok: false, error: e.message, log }, 500);
-  }
-});
-
-// ── Presses API ─────────────────────────────────────────────────────────────
-app.get('/api/presses', async (c) => {
-  const db = c.env.DB;
-  try {
-    const result = await db.prepare(`SELECT * FROM presses ORDER BY sort_order`).all();
-    return c.json({ presses: result.results || [] });
-  } catch(e) {
-    return c.json({ error: e.message, presses: [] }, 500);
-  }
-});
-
-app.put('/api/presses/:id', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const { status } = body;
-  try {
-    await db.prepare(`UPDATE presses SET status = ? WHERE id = ?`).bind(status, id).run();
-    return c.json({ ok: true });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-// ── Dashboard API ───────────────────────────────────────────────────────────
-app.get('/api/dashboard', async (c) => {
-  const db = c.env.DB;
-  try {
-    // Ensure presses table exists
-    await db.prepare(`CREATE TABLE IF NOT EXISTS presses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      machine TEXT,
-      max_colors INTEGER DEFAULT 8,
-      status TEXT DEFAULT 'idle',
-      sort_order INTEGER DEFAULT 0
-    )`).run();
-
-    const result = await db.prepare(`
-      SELECT
-        p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
-        j.id as job_id, j.job_number, j.job_title, j.print_method, j.color_count, j.status as job_status,
-        j.setup_start_at, j.first_pull_at, j.prod_start_at, j.prev_units, j.curr_units, j.actual_stops, j.actual_waste, j.target_units,
-        b.id as benchmark_id, b.color as color_name, b.color_hex, b.de, b.ds, b.delta_c, b.created_at as measured_at,
-        b.sctv_5, b.sctv_10, b.sctv_25, b.sctv_50, b.sctv_75
-      FROM presses p
-      LEFT JOIN jobs j ON j.press_id = p.id AND j.status IN ('active', 'pending', 'setup', 'andruck')
-      LEFT JOIN (
-        SELECT *, ROW_NUMBER() OVER (PARTITION BY job_id, color ORDER BY created_at DESC) as rn
-        FROM benchmarks
-      ) b ON b.job_id = j.id AND b.rn = 1
-      ORDER BY p.sort_order, j.updated_at DESC, b.color
-    `).all();
-
-    var rows = result.results || [];
-
-    // Group into nested structure
-    var pressMap = {};
-    var pressOrder = [];
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var pid = r.press_id;
-      if (!pressMap[pid]) {
-        pressMap[pid] = {
-          id: pid,
-          name: r.press_name,
-          machine: r.press_machine,
-          max_colors: r.max_colors,
-          status: r.press_status,
-          sort_order: r.sort_order,
-          _jobs: {}
-        };
-        pressOrder.push(pid);
-      }
-      if (r.job_id) {
-        if (!pressMap[pid]._jobs[r.job_id]) {
-          pressMap[pid]._jobs[r.job_id] = {
-            id: r.job_id,
-            job_number: r.job_number,
-            job_title: r.job_title,
-            print_method: r.print_method,
-            color_count: r.color_count,
-            status: r.job_status,
-            setup_start_at: r.setup_start_at,
-            first_pull_at: r.first_pull_at,
-            prod_start_at: r.prod_start_at,
-            curr_units: r.curr_units,
-            target_units: r.target_units,
-            actual_stops: r.actual_stops,
-            actual_waste: r.actual_waste,
-            measurements: []
-          };
-        }
-        if (r.color_name) {
-          pressMap[pid]._jobs[r.job_id].measurements.push({
-            id: r.benchmark_id,
-            color_name: r.color_name,
-            color_hex: r.color_hex,
-            de: r.de,
-            ds: r.ds,
-            delta_c: r.delta_c,
-            measured_at: r.measured_at,
-            sctv_5: r.sctv_5,
-            sctv_10: r.sctv_10,
-            sctv_25: r.sctv_25,
-            sctv_50: r.sctv_50,
-            sctv_75: r.sctv_75
-          });
-        }
-      }
-    }
-
-    var presses = [];
-    for (var k = 0; k < pressOrder.length; k++) {
-      var press = pressMap[pressOrder[k]];
-      var jobsArr = [];
-      var jobKeys = Object.keys(press._jobs);
-      for (var j = 0; j < jobKeys.length; j++) {
-        var job = press._jobs[jobKeys[j]];
-        
-        // Ensure CMYK fix rows for the active job
-        var cmykNames = ['Cyan', 'Magenta', 'Yellow', 'Black'];
-        var cmykHex = { 'Cyan': '#00a3e0', 'Magenta': '#e9008c', 'Yellow': '#ffed00', 'Black': '#000000' };
-        var finalMeasurements = [];
-        
-        cmykNames.forEach(function(name) {
-          var found = job.measurements.find(function(m) { return m.color_name === name; });
-          if (found) {
-            finalMeasurements.push(found);
-          } else {
-            finalMeasurements.push({ color_name: name, color_hex: cmykHex[name], de: null, ds: null, delta_c: null });
-          }
-        });
-        
-        // Add other spot colors
-        job.measurements.forEach(function(m) {
-          if (!cmykNames.includes(m.color_name)) {
-            finalMeasurements.push(m);
-          }
-        });
-        
-        job.measurements = finalMeasurements;
-        jobsArr.push(job);
-      }
-      // Sort by descending ID to ensure the newest job is first
-      jobsArr.sort(function(a, b) { return b.id - a.id; });
-      // Only keep the current (most recent) job per press
-      jobsArr = jobsArr.slice(0, 1);
-      presses.push({
-        id: press.id,
-        name: press.name,
-        machine: press.machine,
-        max_colors: press.max_colors,
-        sort_order: press.sort_order,
-        jobs: jobsArr
-      });
-    }
-
-    // Per-press performance stats (24h, 7d, 30d)
-    const now = new Date();
-    const d24h = new Date(now.getTime() - 24*60*60*1000).toISOString().replace('T',' ').substring(0,19);
-    const d7d  = new Date(now.getTime() - 7*24*60*60*1000).toISOString().replace('T',' ').substring(0,19);
-    const d30d = new Date(now.getTime() - 30*24*60*60*1000).toISOString().replace('T',' ').substring(0,19);
-
-    for (var pi2 = 0; pi2 < presses.length; pi2++) {
-      var pr = presses[pi2];
-      try {
-        const pjobs = await db.prepare('SELECT id FROM jobs WHERE press_id = ?').bind(pr.id).all();
-        const pjIds = (pjobs.results || []).map(r => r.id);
-        if (pjIds.length === 0) {
-          pr.perf = { h24: null, d7: null, d30: null };
-          continue;
-        }
-        const idList = pjIds.join(',');
-        // First-pass rate: measurement_seq = 1 or IS NULL (legacy data)
-        const fpWhere = 'job_id IN (' + idList + ') AND (measurement_seq = 1 OR measurement_seq IS NULL)';
-        const r24 = await db.prepare('SELECT COUNT(*) as total, SUM(CASE WHEN de < 2.0 THEN 1 ELSE 0 END) as pass FROM benchmarks WHERE ' + fpWhere + ' AND created_at >= ?').bind(d24h).first();
-        const r7  = await db.prepare('SELECT COUNT(*) as total, SUM(CASE WHEN de < 2.0 THEN 1 ELSE 0 END) as pass FROM benchmarks WHERE ' + fpWhere + ' AND created_at >= ?').bind(d7d).first();
-        const r30 = await db.prepare('SELECT COUNT(*) as total, SUM(CASE WHEN de < 2.0 THEN 1 ELSE 0 END) as pass FROM benchmarks WHERE ' + fpWhere + ' AND created_at >= ?').bind(d30d).first();
-        pr.perf = {
-          h24: r24 && r24.total > 0 ? { pass: r24.pass, total: r24.total, rate: Math.round(r24.pass / r24.total * 100) } : null,
-          d7:  r7  && r7.total  > 0 ? { pass: r7.pass,  total: r7.total,  rate: Math.round(r7.pass  / r7.total  * 100) } : null,
-          d30: r30 && r30.total > 0 ? { pass: r30.pass, total: r30.total, rate: Math.round(r30.pass / r30.total * 100) } : null
-        };
-      } catch(e) {
-        pr.perf = { h24: null, d7: null, d30: null };
-      }
-    }
-
-    return c.json({ presses });
-  } catch(e) {
-    return c.json({ error: e.message, presses: [] }, 500);
-  }
-});
-
-app.post('/api/jobs/:id/action', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const { action } = await c.req.json();
-  const now = new Date().toISOString();
-  try {
-    let updateSql = '';
-    let params = [];
-
-    if (action === 'start-setup') {
-      updateSql = 'UPDATE jobs SET status = ?, setup_start_at = ?, updated_at = ? WHERE id = ?';
-      params = ['setup', now, now, id];
-    } else if (action === 'first-pull') {
-      updateSql = 'UPDATE jobs SET status = ?, first_pull_at = ?, updated_at = ? WHERE id = ?';
-      params = ['andruck', now, now, id];
-    } else if (action === 'start-prod') {
-      updateSql = 'UPDATE jobs SET status = ?, prod_start_at = ?, updated_at = ? WHERE id = ?';
-      params = ['active', now, now, id];
-    }
-
-    if (updateSql) {
-      await db.prepare(updateSql).bind(...params).run();
-      return c.json({ ok: true });
-    }
-    return c.json({ error: 'Invalid action' }, 400);
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.put('/api/jobs/:id/performance', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const { stops, waste, units } = await c.req.json();
-  try {
-    await db.prepare('UPDATE jobs SET actual_stops = ?, actual_waste = ?, curr_units = ?, updated_at = (datetime(\'now\')) WHERE id = ?')
-      .bind(stops, waste, units, id).run();
-    return c.json({ ok: true });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-// ── Jobs API ───────────────────────────────────────────────────────────────
-app.get('/api/jobs', async (c) => {
-  const db = c.env.DB;
-  try {
-    // Ensure jobs table exists
-    await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_number TEXT NOT NULL UNIQUE,
-      job_title TEXT NOT NULL,
-      print_method TEXT,
-      color_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'active',
-      job_state TEXT DEFAULT 'ready',
-      target_units INTEGER DEFAULT 0,
-      actual_units INTEGER DEFAULT 0,
-      waste_units INTEGER DEFAULT 0,
-      stops_count INTEGER DEFAULT 0,
-      setup_start_at TEXT,
-      first_pull_at TEXT,
-      production_start_at TEXT,
-      completed_at TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-
-    // Detect actual column names in benchmarks table
-    const tableInfo = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
-    const cols = (tableInfo.results || []).map(r => r.name);
-
-    // Add missing columns if needed
-    if (!cols.includes('job_id')) {
-      try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN job_id INTEGER`).run(); } catch(e) {}
-    }
-    if (!cols.includes('color_hex')) {
-      try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN color_hex TEXT`).run(); } catch(e) {}
-    }
-
-    // Determine actual column names (legacy vs new)
-    const colorCol = cols.includes('color_name') ? 'color_name' : (cols.includes('color') ? 'color' : 'color_name');
-    const dateCol = cols.includes('measured_at') ? 'measured_at' : (cols.includes('created_at') ? 'created_at' : 'measured_at');
-
-    const jobs = await db.prepare(`SELECT * FROM jobs WHERE status = 'active' ORDER BY updated_at DESC`).all();
-
-    const jobsWithMeasurements = await Promise.all((jobs.results || []).map(async (job) => {
-      try {
-        const measurements = await db.prepare(`
-          SELECT ${colorCol} as color_name, color_hex, de, ds, delta_c, ${dateCol} as measured_at
-          FROM (
-            SELECT *, ROW_NUMBER() OVER (PARTITION BY ${colorCol} ORDER BY ${dateCol} DESC) as rn
-            FROM benchmarks WHERE job_id = ?
-          ) WHERE rn = 1
-        `).bind(job.id).all();
-        return { ...job, measurements: measurements.results || [] };
-      } catch(e) {
-        return { ...job, measurements: [] };
-      }
-    }));
-
-    return c.json({ jobs: jobsWithMeasurements });
-  } catch(e) {
-    return c.json({ error: e.message, jobs: [] }, 500);
-  }
-});
-
-app.post('/api/jobs', async (c) => {
-  const db = c.env.DB;
-  await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_number TEXT NOT NULL UNIQUE,
-    job_title TEXT NOT NULL,
-    print_method TEXT,
-    color_count INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'active',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-  )`).run();
-
-  // Ensure press_id column exists
-  const jobsInfo = await db.prepare(`PRAGMA table_info(jobs)`).all();
-  const jobsCols = (jobsInfo.results || []).map(r => r.name);
-  if (!jobsCols.includes('press_id')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN press_id INTEGER`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('job_state')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN job_state TEXT DEFAULT 'ready'`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('target_units')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN target_units INTEGER DEFAULT 0`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('curr_units')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN curr_units INTEGER DEFAULT 0`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('actual_waste')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN actual_waste INTEGER DEFAULT 0`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('actual_stops')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN actual_stops INTEGER DEFAULT 0`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('setup_start_at')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN setup_start_at TEXT`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('first_pull_at')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN first_pull_at TEXT`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('production_start_at')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN production_start_at TEXT`).run(); } catch(e) {}
-  }
-  if (!jobsCols.includes('completed_at')) {
-    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN completed_at TEXT`).run(); } catch(e) {}
-  }
-
-  const body = await c.req.json();
-  const { job_number, job_title, print_method, color_count, press_id, target_units, colors } = body;
-  if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
-
-  try {
-    if (press_id) {
-      // Mark all existing active jobs for this press as completed
-      await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status = ?').bind('completed', press_id, 'active').run();
-    }
-
-    const result = await db.prepare(
-      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready').run();
-
-    const newJobId = result.meta.last_row_id;
-
-    if (colors && Array.isArray(colors)) {
-      for (let i = 0; i < colors.length; i++) {
-        const cName = colors[i];
-        if (cName) {
-          await db.prepare('INSERT INTO benchmarks (job_id, color, created_at) VALUES (?, ?, datetime("now"))')
-            .bind(newJobId, cName).run();
-        }
-      }
-    }
-
-    return c.json({ id: newJobId, job_number, job_title });
-  } catch(e) {
-    if (e.message && e.message.includes('UNIQUE constraint')) {
-      return c.json({ error: 'Job number already exists. Please use a unique job number.' }, 409);
-    }
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.put('/api/jobs/:id', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const { job_title, print_method, color_count, status, press_id } = body;
-  await db.prepare(
-    `UPDATE jobs SET job_title=COALESCE(?,job_title), print_method=COALESCE(?,print_method),
-     color_count=COALESCE(?,color_count), status=COALESCE(?,status),
-     press_id=COALESCE(?,press_id),
-     updated_at=datetime('now') WHERE id=?`
-  ).bind(job_title||null, print_method||null, color_count||null, status||null, press_id||null, id).run();
-  return c.json({ ok: true });
-});
-
-app.get('/api/jobs/:id/history', async (c) => {
-  const db = c.env.DB;
-  const jobId = c.req.param('id');
-  try {
-    const tableInfo = await db.prepare('PRAGMA table_info(benchmarks)').all();
-    const cols = (tableInfo.results || []).map(r => r.name);
-    const colorCol = cols.includes('color') ? 'color' : 'color_name';
-
-    // Get ALL measurements for this job, grouped by color, ordered by seq/time
-    const result = await db.prepare(
-      'SELECT id, ' + colorCol + ' as color_name, color_hex, de, ds, delta_c, delta_h, delta_l, ' +
-      'created_at, measurement_seq, edited_at, edited_from, status_en, benchmark_en, diagnosis_en, ' +
-      'status_tr, benchmark_tr, diagnosis_tr ' +
-      'FROM benchmarks WHERE job_id = ? ORDER BY ' + colorCol + ', COALESCE(measurement_seq, 1), created_at'
-    ).bind(jobId).all();
-
-    // Group by color
-    var colors = {};
-    var colorOrder = [];
-    (result.results || []).forEach(function(r) {
-      var cn = r.color_name || 'Unknown';
-      if (!colors[cn]) { colors[cn] = []; colorOrder.push(cn); }
-      colors[cn].push(r);
-    });
-
-    return c.json({ colors: colors, colorOrder: colorOrder });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});app.put('/api/jobs/:id/colors/:colorName', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const colorName = decodeURIComponent(c.req.param('colorName'));
-  const body = await c.req.json();
-  const { new_color } = body;
-  if (!new_color) return c.json({ error: 'new_color required' }, 400);
-
-  try {
-    // Check if the new color name already exists for this job (to prevent duplicates if they accidentally typed one that's already there)
-    const existing = await db.prepare('SELECT id FROM benchmarks WHERE job_id = ? AND color = ?').bind(id, new_color).first();
-    if (existing && new_color !== colorName) {
-      return c.json({ error: 'Color name already exists in this job' }, 409);
-    }
-
-    await db.prepare('UPDATE benchmarks SET color = ? WHERE job_id = ? AND color = ?')
-      .bind(new_color, id, colorName).run();
-    return c.json({ ok: true });
-  } catch (e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.delete('/api/jobs/:id/colors/:colorName', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const colorName = decodeURIComponent(c.req.param('colorName'));
-  
-  try {
-    await db.prepare('DELETE FROM benchmarks WHERE job_id = ? AND color = ?')
-      .bind(id, colorName).run();
-    return c.json({ ok: true });
-  } catch (e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.put('/api/benchmarks/:id', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  try {
-    // Get current values for audit trail
-    const current = await db.prepare('SELECT de, ds, delta_c FROM benchmarks WHERE id = ?').bind(id).first();
-    if (!current) return c.json({ error: 'Not found' }, 404);
-
-    var editedFrom = JSON.stringify({ de: current.de, ds: current.ds, delta_c: current.delta_c });
-
-    const { de, ds, delta_c, sctv_5, sctv_10, sctv_25, sctv_50, sctv_75 } = body;
-
-    // Re-evaluate with new values
-    const evalResult = evaluateColor(
-      { de, ds, delta_c, delta_h: 0, delta_l: 0 },
-      { process_type: 'gravure', viscosity: null }
-    );
-
-    await db.prepare(
-      `UPDATE benchmarks SET de=?, ds=?, delta_c=?, 
-       sctv_5=?, sctv_10=?, sctv_25=?, sctv_50=?, sctv_75=?,
-       edited_at=datetime('now'), edited_from=?, status_en=?, status_tr=?, benchmark_en=?, benchmark_tr=?, diagnosis_en=?, diagnosis_tr=? 
-       WHERE id=?`
-    ).bind(
-      de, ds, delta_c, 
-      sctv_5||null, sctv_10||null, sctv_25||null, sctv_50||null, sctv_75||null,
-      editedFrom,
-      evalResult.status_en, evalResult.status_tr,
-      evalResult.benchmark_en, evalResult.benchmark_tr,
-      evalResult.diagnosis_en, evalResult.diagnosis_tr,
-      id
-    ).run();
-
-    return c.json({ ok: true });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.post('/api/jobs/:id/measurements', async (c) => {
-  const db = c.env.DB;
-  const jobId = c.req.param('id');
-  const body = await c.req.json();
-
-  try {
-    const tableInfo = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
-    const cols = (tableInfo.results || []).map(r => r.name);
-    const jobColumn = cols.includes('product') ? 'product' : 'job';
-    const colorColumn = cols.includes('color') ? 'color' : 'color_name';
-
-    // Add missing columns
-    if (!cols.includes('job_id')) {
-      try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN job_id INTEGER`).run(); } catch(e) {}
-    }
-    if (!cols.includes('color_hex')) {
-      try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN color_hex TEXT`).run(); } catch(e) {}
-    }
-
-    const {
-      color_name, color_hex, de, ds, delta_c, delta_h, delta_l, process_type, machine, viscosity,
-      sctv_5, sctv_10, sctv_25, sctv_50, sctv_75
-    } = body;
-
-    // Evaluate the color for status/diagnosis fields
-    const evalResult = evaluateColor(
-      { de, ds, delta_c, delta_h: delta_h || 0, delta_l: delta_l || 0 },
-      { process_type: process_type || 'gravure', viscosity }
-    );
-
-    // Determine measurement sequence (1 = first pass)
-    let measurement_seq = 1;
-    try {
-      const seqResult = await db.prepare(
-        'SELECT COUNT(*) as cnt FROM benchmarks WHERE job_id = ? AND ' + colorColumn + ' = ?'
-      ).bind(jobId, color_name).first();
-      measurement_seq = (seqResult ? seqResult.cnt : 0) + 1;
-    } catch(e) {}
-
-    await db.prepare(
-      `INSERT INTO benchmarks (job_id, ${colorColumn}, color_hex, de, ds, delta_c, delta_h, delta_l,
-       process_type, machine, ${jobColumn}, viscosity, date, time,
-       status_en, status_tr, benchmark_en, benchmark_tr, diagnosis_en, diagnosis_tr, measurement_seq,
-       sctv_5, sctv_10, sctv_25, sctv_50, sctv_75)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), time('now'),
-       ?, ?, ?, ?, ?, ?, ?,
-       ?, ?, ?, ?, ?)`
-    ).bind(
-      jobId, color_name, color_hex||null, de||null, ds||null, delta_c||null,
-      delta_h||null, delta_l||null, process_type||null, machine||null,
-      color_name, viscosity||null,
-      evalResult.status_en, evalResult.status_tr,
-      evalResult.benchmark_en, evalResult.benchmark_tr,
-      evalResult.diagnosis_en, evalResult.diagnosis_tr,
-      measurement_seq,
-      sctv_5||null, sctv_10||null, sctv_25||null, sctv_50||null, sctv_75||null
-    ).run();
-
-    await db.prepare(`UPDATE jobs SET updated_at=datetime('now') WHERE id=?`).bind(jobId).run();
-
-    return c.json({ ok: true });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-
-// ── Analytics API ────────────────────────────────────────────────────────────
-app.get('/api/analytics', async (c) => {
-  const db = c.env.DB;
-  try {
-    const days = parseInt(c.req.query('days')) || 30;
-    const pressId = c.req.query('press_id');
-    const now = new Date();
-    const since = new Date(now.getTime() - days * 24*60*60*1000).toISOString().replace('T',' ').substring(0,19);
-
-    // Press list for filter
-    const pressResult = await db.prepare('SELECT id, name FROM presses ORDER BY sort_order').all();
-    const presses = pressResult.results || [];
-
-    // Build WHERE clause
-    let where = 'b.created_at >= ?';
-    let binds = [since];
-    if (pressId && pressId !== 'all') {
-      where += ' AND j.press_id = ?';
-      binds.push(parseInt(pressId));
-    }
-
-    // ── KPIs ──
-    const kpiQ = await db.prepare(
-      `SELECT COUNT(*) as total,
-        AVG(b.de) as avg_de,
-        SUM(CASE WHEN b.de < 2.0 AND (b.measurement_seq = 1 OR b.measurement_seq IS NULL) THEN 1 ELSE 0 END) as fpr_pass,
-        SUM(CASE WHEN b.measurement_seq = 1 OR b.measurement_seq IS NULL THEN 1 ELSE 0 END) as fpr_total,
-        SUM(CASE WHEN b.measurement_seq > 1 THEN 1 ELSE 0 END) as corrections
-       FROM benchmarks b
-       LEFT JOIN jobs j ON j.id = b.job_id
-       WHERE ${where}`
-    ).bind(...binds).first();
-
-    const jobCountQ = await db.prepare(
-      `SELECT COUNT(DISTINCT b.job_id) as job_count
-       FROM benchmarks b LEFT JOIN jobs j ON j.id = b.job_id
-       WHERE ${where}`
-    ).bind(...binds).first();
-
-    const fpr = kpiQ.fpr_total > 0 ? Math.round(kpiQ.fpr_pass / kpiQ.fpr_total * 100) : null;
-    const corrPerJob = jobCountQ.job_count > 0 ? kpiQ.corrections / jobCountQ.job_count : null;
-
-    // Cpk: (USL - mean) / (3 * stddev), USL = 2.0
-    const cpkQ = await db.prepare(
-      `SELECT AVG(b.de) as mean_de,
-        AVG(b.de * b.de) as mean_sq_de,
-        COUNT(*) as n
-       FROM benchmarks b LEFT JOIN jobs j ON j.id = b.job_id
-       WHERE ${where} AND b.de IS NOT NULL`
-    ).bind(...binds).first();
-
-    let cpk = null;
-    if (cpkQ.n >= 3) {
-      const variance = cpkQ.mean_sq_de - (cpkQ.mean_de * cpkQ.mean_de);
-      const stddev = Math.sqrt(Math.max(0, variance));
-      if (stddev > 0) cpk = (2.0 - cpkQ.mean_de) / (3 * stddev);
-    }
-
-    // ── Problem colors (top 10 by avg dE, at least 2 measurements) ──
-    const colorQ = await db.prepare(
-      `SELECT b.color as color_name, MAX(b.color_hex) as color_hex,
-        COUNT(*) as count, AVG(b.de) as avg_de, MAX(b.de) as max_de,
-        ROUND(100.0 * SUM(CASE WHEN b.de >= 2.0 THEN 1 ELSE 0 END) / COUNT(*)) as fail_pct
-       FROM benchmarks b LEFT JOIN jobs j ON j.id = b.job_id
-       WHERE ${where} AND b.de IS NOT NULL
-       GROUP BY b.color HAVING COUNT(*) >= 2
-       ORDER BY avg_de DESC LIMIT 10`
-    ).bind(...binds).all();
-
-    // ── Problem jobs (top 10 by avg dE) ──
-    const jobQ = await db.prepare(
-      `SELECT j.job_title, j.job_number, p.name as press_name,
-        COUNT(DISTINCT b.color) as color_count,
-        AVG(b.de) as avg_de,
-        SUM(CASE WHEN b.measurement_seq > 1 THEN 1 ELSE 0 END) as corrections,
-        ROUND(100.0 * SUM(CASE WHEN b.de < 2.0 AND (b.measurement_seq=1 OR b.measurement_seq IS NULL) THEN 1 ELSE 0 END) /
-          NULLIF(SUM(CASE WHEN b.measurement_seq=1 OR b.measurement_seq IS NULL THEN 1 ELSE 0 END), 0)) as pass_rate
-       FROM benchmarks b
-       LEFT JOIN jobs j ON j.id = b.job_id
-       LEFT JOIN presses p ON p.id = j.press_id
-       WHERE ${where} AND b.de IS NOT NULL AND j.id IS NOT NULL
-       GROUP BY b.job_id
-       ORDER BY avg_de DESC LIMIT 10`
-    ).bind(...binds).all();
-
-    // ── Press comparison ──
-    const pressCompQ = await db.prepare(
-      `SELECT p.id, p.name,
-        COUNT(b.id) as total,
-        COUNT(DISTINCT b.job_id) as jobs,
-        AVG(b.de) as avg_de,
-        ROUND(100.0 * SUM(CASE WHEN b.de < 2.0 AND (b.measurement_seq=1 OR b.measurement_seq IS NULL) THEN 1 ELSE 0 END) /
-          NULLIF(SUM(CASE WHEN b.measurement_seq=1 OR b.measurement_seq IS NULL THEN 1 ELSE 0 END), 0)) as fpr
-       FROM presses p
-       LEFT JOIN jobs j ON j.press_id = p.id
-       LEFT JOIN benchmarks b ON b.job_id = j.id AND b.created_at >= ?
-       GROUP BY p.id
-       ORDER BY p.sort_order`
-    ).bind(since).all();
-
-    // ── Trend data (daily aggregates) ──
-    const trendQ = await db.prepare(
-      `SELECT DATE(b.created_at) as date,
-        AVG(b.de) as avg_de,
-        ROUND(100.0 * SUM(CASE WHEN b.de < 2.0 AND (b.measurement_seq=1 OR b.measurement_seq IS NULL) THEN 1 ELSE 0 END) /
-          NULLIF(SUM(CASE WHEN b.measurement_seq=1 OR b.measurement_seq IS NULL THEN 1 ELSE 0 END), 0)) as fpr
-       FROM benchmarks b LEFT JOIN jobs j ON j.id = b.job_id
-       WHERE ${where} AND b.de IS NOT NULL
-       GROUP BY DATE(b.created_at)
-       ORDER BY date`
-    ).bind(...binds).all();
-
-    // ── Rule-based insights ──
-    const insights = [];
-
-    // Insight: Colors that fail on one press but not another
-    const crossPressQ = await db.prepare(
-      `SELECT b.color, p.name as press_name, AVG(b.de) as avg_de
-       FROM benchmarks b
-       LEFT JOIN jobs j ON j.id = b.job_id
-       LEFT JOIN presses p ON p.id = j.press_id
-       WHERE b.created_at >= ? AND b.de IS NOT NULL AND p.id IS NOT NULL
-       GROUP BY b.color, p.id
-       HAVING COUNT(*) >= 2
-       ORDER BY b.color`
-    ).bind(since).all();
-
-    // Find colors with big dE variance across presses
-    var crossPressMap = {};
-    (crossPressQ.results || []).forEach(function(r) {
-      if (!crossPressMap[r.color]) crossPressMap[r.color] = [];
-      crossPressMap[r.color].push({ press: r.press_name, avg: r.avg_de });
-    });
-    for (var clr in crossPressMap) {
-      var entries = crossPressMap[clr];
-      if (entries.length >= 2) {
-        var best = entries.reduce(function(a, b) { return a.avg < b.avg ? a : b; });
-        var worst = entries.reduce(function(a, b) { return a.avg > b.avg ? a : b; });
-        if (worst.avg - best.avg > 1.5) {
-          insights.push({
-            level: 'warn',
-            type: 'color-press-mismatch',
-            data: { color: clr, worst_press: worst.press, worst_de: worst.avg.toFixed(1), best_press: best.press, best_de: best.avg.toFixed(1) },
-            meta: 'color-press-mismatch'
-          });
-        }
-      }
-    }
-
-    // Insight: Repeat offender jobs (>3 corrections)
-    (jobQ.results || []).forEach(function(j) {
-      if (j.corrections >= 3) {
-        insights.push({
-          level: 'crit',
-          type: 'repeat-offender',
-          data: { job: j.job_title || j.job_number, corrections: j.corrections },
-          meta: 'repeat-offender'
-        });
-      }
-    });
-
-    // Insight: Overall FPR warning
-    if (fpr != null && fpr < 60) {
-      insights.push({
-        level: 'crit',
-        type: 'low-fpr',
-        data: { fpr: fpr },
-        meta: 'low-fpr'
-      });
-    } else if (fpr != null && fpr < 80) {
-      insights.push({
-        level: 'warn',
-        type: 'moderate-fpr',
-        data: { fpr: fpr },
-        meta: 'moderate-fpr'
-      });
-    }
-
-    // ── Job history (all jobs with stats) ──
-    const jobHistQ = await db.prepare(
-      `SELECT j.id, j.job_number, j.job_title, j.status, j.created_at, j.color_count,
-        p.name as press_name,
-        COUNT(b.id) as measurements,
-        AVG(b.de) as avg_de,
-        SUM(CASE WHEN b.measurement_seq > 1 THEN 1 ELSE 0 END) as corrections,
-        ROUND(100.0 * SUM(CASE WHEN b.de < 2.0 AND (b.measurement_seq=1 OR b.measurement_seq IS NULL) THEN 1 ELSE 0 END) /
-          NULLIF(SUM(CASE WHEN b.measurement_seq=1 OR b.measurement_seq IS NULL THEN 1 ELSE 0 END), 0)) as pass_rate
-       FROM jobs j
-       LEFT JOIN presses p ON p.id = j.press_id
-       LEFT JOIN benchmarks b ON b.job_id = j.id
-       ${pressId && pressId !== 'all' ? 'WHERE j.press_id = ?' : 'WHERE 1=1'}
-       GROUP BY j.id
-       ORDER BY j.updated_at DESC
-       LIMIT 50`
-    ).bind(...(pressId && pressId !== 'all' ? [parseInt(pressId)] : [])).all();
-
-    return c.json({
-      presses,
-      kpis: {
-        fpr,
-        fpr_pass: kpiQ.fpr_pass || 0,
-        fpr_total: kpiQ.fpr_total || 0,
-        avg_de: kpiQ.avg_de,
-        total_measurements: kpiQ.total,
-        corrections_per_job: corrPerJob,
-        cpk
-      },
-      problem_colors: (colorQ.results || []).map(r => ({ ...r, avg_de: r.avg_de || 0, max_de: r.max_de || 0, fail_pct: r.fail_pct || 0 })),
-      problem_jobs: (jobQ.results || []).map(r => ({ ...r, avg_de: r.avg_de || 0, pass_rate: r.pass_rate || 0, corrections: r.corrections || 0 })),
-      press_comparison: (pressCompQ.results || []).map(r => ({ ...r, avg_de: r.avg_de, fpr: r.fpr || 0 })),
-      trends: (trendQ.results || []).map(r => ({ date: r.date, avg_de: r.avg_de || 0, fpr: r.fpr || 0 })),
-      job_history: (jobHistQ.results || []).map(r => ({ ...r, avg_de: r.avg_de || 0, pass_rate: r.pass_rate || 0, corrections: r.corrections || 0 })),
-      insights
-    });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.post('/api/benchmark', async (c) => {
-    try {
-        const body = await c.req.json()
-        const { date, time, machine, process_type, product, viscosity, print_speed, drying_temp, colors } = body
-
-        if (!Array.isArray(colors) || colors.length === 0) {
-            return c.json({ success: false, error: 'No colors provided.' }, 400)
-        }
-
-        const db = c.env.DB;
-        const { results: tableInfo } = await db.prepare("PRAGMA table_info(benchmarks)").all();
-        const hasProduct = tableInfo.some(col => col.name === 'product');
-        const jobColumn = hasProduct ? 'product' : 'job';
-
-        const stmts = []
-
-        const globalData = { process_type, viscosity }
-
-        for (const colorItem of colors) {
-            const { color, de, ds, delta_c, delta_h, delta_l } = colorItem
-            const result = evaluateColor(colorItem, globalData)
-
-            stmts.push(
-                db.prepare(
-                    `INSERT INTO benchmarks (date, time, machine, process_type, ${jobColumn}, color, de, ds, delta_c, delta_h, delta_l, viscosity, print_speed, drying_temp, status_en, status_tr, benchmark_en, benchmark_tr, diagnosis_en, diagnosis_tr)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                ).bind(
-                    date, time, machine, process_type || 'gravure', product, color,
-                    de || 0, ds || 0, delta_c || 0, delta_h || 0, delta_l || 0,
-                    viscosity ? Number(viscosity) : null,
-                    print_speed ? Number(print_speed) : null,
-                    drying_temp ? Number(drying_temp) : null,
-                    result.status_en, result.status_tr, result.benchmark_en, result.benchmark_tr, result.diagnosis_en, result.diagnosis_tr
-                )
-            )
-        }
-
-        await db.batch(stmts)
-        return c.json({ success: true })
-    } catch (error) {
-        console.error('API Error:', error)
-        return c.json({ success: false, error: 'Database error or Invalid Payload.', details: error.message }, 500)
-    }
-})
-
-app.get('/api/benchmarks', async (c) => {
-    try {
-        const db = c.env.DB;
-
-        const { results: tableInfo } = await db.prepare("PRAGMA table_info(benchmarks)").all();
-        const hasProduct = tableInfo.some(col => col.name === 'product');
-        const jobColumn = hasProduct ? 'product' : 'job';
-
-        const machine = c.req.query('machine');
-        const process = c.req.query('process_type');
-        const from = c.req.query('from');
-        const to = c.req.query('to');
-        const color = c.req.query('color');
-
-        let query = `SELECT *, ${jobColumn} AS product FROM benchmarks WHERE 1=1 `;
-        const params = [];
-
-        if (machine) { query += " AND machine = ?"; params.push(machine); }
-        if (process) { query += " AND process_type = ?"; params.push(process); }
-        if (from) { query += " AND date >= ?"; params.push(from); }
-        if (to) { query += " AND date <= ?"; params.push(to); }
-        if (color) { query += " AND color LIKE ?"; params.push('%' + color + '%'); }
-
-        query += " ORDER BY date DESC, time DESC LIMIT 200";
-
-        console.log('BENCHMARKS QUERY:', query, params);
-        const { results } = await db.prepare(query).bind(...params).all();
-        console.log('BENCHMARKS RESULTS COUNT:', results.length);
-
-        return c.json({ success: true, data: results });
-    } catch (error) {
-        console.error('API Error:', error)
-        return c.json({ success: false, error: 'Query failed.', details: error.message }, 500)
-    }
-})
-
-app.get('/api/test-db', async (c) => {
-    try {
-        const db = c.env.DB;
-        if (!db) return c.json({ success: false, error: 'DB binding missing' });
-        const { results } = await db.prepare("PRAGMA table_info(benchmarks)").all();
-        const count = await db.prepare("SELECT COUNT(*) as c FROM benchmarks").first();
-        return c.json({ success: true, columns: results, count: count.c });
-    } catch (e) {
-        return c.json({ success: false, error: e.message });
-    }
-})
-
-app.get('/api/recent', async (c) => {
-    try {
-        const db = c.env.DB;
-        const { results: tableInfo } = await db.prepare("PRAGMA table_info(benchmarks)").all();
-        const hasProduct = tableInfo.some(col => col.name === 'product');
-        const jobColumn = hasProduct ? 'product' : 'job';
-
-        const today = new Date();
-        const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-        const fromDate = yesterday.toISOString().split('T')[0];
-
-        const { results } = await db.prepare(
-            `SELECT *, ${jobColumn} AS product FROM benchmarks WHERE date >= ? ORDER BY date DESC, time DESC LIMIT 50`
-        ).bind(fromDate).all();
-
-        return c.json({ success: true, data: results });
-    } catch (error) {
-        console.error('Recent API Error:', error);
-        return c.json({ success: false, error: 'Query failed.', details: error.message }, 500);
-    }
-})
-
-export default app
+</html>

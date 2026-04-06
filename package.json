@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:preview": "wrangler deploy --env preview",
+    "deploy:preview2": "wrangler deploy --env preview2",
     "cf-typegen": "wrangler types",
     "test": "playwright test"
   },
