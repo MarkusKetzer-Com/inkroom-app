@@ -2881,6 +2881,39 @@ app.get('/api/dashboard', async (c) => {
       sort_order INTEGER DEFAULT 0
     )`).run();
 
+    await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_number TEXT NOT NULL UNIQUE,
+      job_title TEXT NOT NULL,
+      press_id INTEGER,
+      print_method TEXT,
+      color_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      job_state TEXT DEFAULT 'ready',
+      target_units INTEGER DEFAULT 0,
+      curr_units INTEGER DEFAULT 0,
+      actual_stops INTEGER DEFAULT 0,
+      actual_waste INTEGER DEFAULT 0,
+      setup_start_at TEXT,
+      first_pull_at TEXT,
+      production_start_at TEXT,
+      completed_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+
+    await db.prepare(`CREATE TABLE IF NOT EXISTS benchmarks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER,
+      color TEXT,
+      color_hex TEXT,
+      de REAL,
+      ds REAL,
+      delta_c REAL,
+      sctv_5 REAL, sctv_10 REAL, sctv_25 REAL, sctv_50 REAL, sctv_75 REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+
     const result = await db.prepare(`
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
