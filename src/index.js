@@ -1888,10 +1888,13 @@ app.get('/', (c) => {
     }
 
     function renderDashboard(data) {
+      data = data || window._lastDashboardData;
+      if (!data) return;
       var container = document.getElementById('dashboard');
       var presses = data.presses || [];
       // Cache presses for New Job modal capacity validation
       window._pressesCache = presses;
+      jobsLookup = {};
 
       if (presses.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:80px 24px;">' +
@@ -1903,11 +1906,21 @@ app.get('/', (c) => {
         return;
       }
 
-      jobsLookup = {};
-      var html = '';
+      var html = '<div class="press-tabs" style="display:flex; gap:8px; border-bottom:1px solid var(--border); margin-bottom: 24px; overflow-x:auto;">';
+      for (var ti = 0; ti < presses.length; ti++) {
+        var pt = presses[ti];
+        var isSelected = (window._selectedPressId == pt.id) || (!window._selectedPressId && ti === 0);
+        if (isSelected) window._selectedPressId = pt.id; // Ensure default is set
+        html += '<button style="padding:10px 20px; border:none; background:none; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid ' + (isSelected ? 'var(--accent)' : 'transparent') + '; color:' + (isSelected ? 'var(--text-primary)' : 'var(--text-secondary)') + ';" onclick="window._selectedPressId=' + pt.id + '; renderDashboard(window._lastDashboardData)">';
+        html += escapeHtml(pt.name);
+        html += '</button>';
+      }
+      html += '</div>';
 
       for (var pi = 0; pi < presses.length; pi++) {
         var press = presses[pi];
+        if (press.id != window._selectedPressId) continue;
+        
         var perf = press.perf || {};
 
         html += '<div class="press-section">';
@@ -1958,6 +1971,8 @@ app.get('/', (c) => {
           return;
         }
         var data = await res.json();
+        window._lastDashboardData = data;
+        if (data.settings) window.systemSettings = data.settings;
         renderDashboard(data);
       } catch (e) {
         console.error('Failed to load dashboard:', e);
@@ -3151,6 +3166,21 @@ app.get('/api/presses', async (c) => {
 app.get('/api/dashboard', async (c) => {
   const db = c.env.DB;
   try {
+    try {
+      await db.prepare(`CREATE TABLE IF NOT EXISTS system_settings (
+        id INTEGER PRIMARY KEY,
+        pull_time_min INTEGER DEFAULT 10,
+        pull_waste_m INTEGER DEFAULT 500,
+        splice_waste_m INTEGER DEFAULT 250,
+        target_speed_m_min INTEGER DEFAULT 300,
+        max_waste_percent INTEGER DEFAULT 3
+      )`).run();
+      await db.prepare(`INSERT OR IGNORE INTO system_settings (id, pull_time_min, pull_waste_m, splice_waste_m, target_speed_m_min, max_waste_percent) VALUES (1, 10, 500, 250, 300, 3)`).run();
+    } catch(e) {}
+    
+    let settingsResult = {};
+    try { settingsResult = await db.prepare('SELECT * FROM system_settings WHERE id = 1').first() || {}; } catch(e) {}
+
     const result = await db.prepare(`
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
@@ -3263,7 +3293,7 @@ app.get('/api/dashboard', async (c) => {
       }
     }
 
-    return c.json({ presses });
+    return c.json({ presses, settings: settingsResult });
   } catch(e) {
     return c.json({ error: e.message, presses: [] }, 500);
   }
