@@ -22,7 +22,7 @@ export const renderJobCard = `
           '</div>' +
           '<input id="' + inputId + '" type="number" step="0.01" min="0" max="10" placeholder="dE" value="' + (lastVal !== '' && lastVal !== null ? lastVal : '') + '" ' +
             'style="width:52px; padding:3px 5px; border:0.5px solid var(--border); border-radius:5px; font-size:11px; text-align:right; font-variant-numeric:tabular-nums;" ' +
-            'oninput="adminDeChange(' + jobId + ', \'' + colorKey + '\', this.value)">' +
+            'oninput="adminDeChange(' + jobId + ', ' + "'" + colorKey + "'" + ', this.value)">' +
           '</div>';
       }
 
@@ -84,9 +84,11 @@ export const renderJobCard = `
                           (status === 'setup') ? (isTR ? 'İlk Çekim' : 'First Pull') :
                           (status === 'andruck') ? (isTR ? 'Üretime Başla' : 'Start Prod') : (isTR ? 'Veri Gir' : 'Metrics');
       
-      var actionFn = (status === 'ready') ? 'handleJobAction(' + job.id + ', \\'start-setup\\')' :
-                     (status === 'setup') ? 'handleJobAction(' + job.id + ', \\'first-pull\\')' :
-                     'openMetricsModal(' + job.id + ', \\'Metrics\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'\\')';
+      var actionFn = (status === 'ready') ? "handleJobAction(" + job.id + ", 'start-setup')" :
+                     (status === 'setup') ? "handleJobAction(" + job.id + ", 'first-pull')" :
+                     (status === 'andruck') ? "handleJobAction(" + job.id + ", 'start-prod')" :
+                     "openMetricsModal(" + job.id + ", 'Metrics', " + unitsActual + ", " + wasteTotal + ", " + stopsTotal + ", ''");
+
 
       return \`<div class="cockpit-grid">
         <!-- TILE 1: JOB INFO -->
