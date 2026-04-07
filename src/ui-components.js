@@ -115,7 +115,7 @@ export const renderJobCard = `
       var wastePct = unitsActual > 0 ? (wasteTotal / unitsActual * 100).toFixed(1) : '0.0';
 
       // ── Benchmark Targets ─────────────────────────────────────────────────
-      var mechTargetMin = ((job.prev_units || 8) + (job.curr_units || 8)) * 2;
+      var mechTargetMin = (job.prev_units || 0) * 1 + (job.color_count || 0) * 2;
 
       var tsToDate = function(ts) {
         if (!ts) return null;
@@ -144,6 +144,7 @@ export const renderJobCard = `
         timerPrefix = 'Setup: ';
         targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Ziel: ' + mechTargetMin + ' Min</span>';
         actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
+        actionBtnHtml += '<button class="btn-ghost" style="margin-top:8px; width:100%; border:1px solid var(--border-subtle);" onclick="resetMachineStatus(' + job.id + ')">' + (isTR ? 'Maschine war leer' : 'Maschine war leer') + '</button>';
       } else if (status === 'andruck') {
         startTime = job.first_pull_at;
         timerPrefix = 'Andruck: ';

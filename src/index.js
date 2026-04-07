@@ -2986,7 +2986,21 @@ app.get('/', (c) => {
       }
     }
 
-    async function renameJobColor(jobId, oldColorName) {
+    async function resetMachineStatus(jobId) {
+      if (!confirm(currentLang === 'tr' ? 'Makinenin boş olduğunu onaylıyor musunuz?' : 'Bestätigen Sie, dass die Maschine leer war? (Setzt Alte Units auf 0)')) return;
+      try {
+        var res = await fetch('/api/jobs/' + jobId + '/empty-machine', { method: 'PUT' });
+        var data = await res.json();
+        if (data.ok) {
+          showToast(currentLang === 'tr' ? 'Güncellendi' : 'Aktualisiert');
+          loadDashboard();
+        }
+      } catch (e) {
+        showToast('Error resetting machine status');
+      }
+    }
+
+    async function updateJobUnits(jobId, currentUnits, currentWaste, currentStops) {
       var newColorName = prompt(currentLang === 'tr' ? 'Yeni renk adını girin:' : 'Enter new color name:', oldColorName);
       if (!newColorName || newColorName.trim() === '' || newColorName === oldColorName) return;
       try {
@@ -3219,6 +3233,17 @@ app.post('/api/jobs/:id/action', async (c) => {
   }
 });
 
+app.put('/api/jobs/:id/empty-machine', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    await db.prepare('UPDATE jobs SET prev_units = 0 WHERE id = ?').bind(id).run();
+    return c.json({ ok: true });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 app.put('/api/jobs/:id/performance', async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
@@ -3361,18 +3386,22 @@ app.post('/api/jobs', async (c) => {
   }
 
   const body = await c.req.json();
-  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
   try {
+    let prev_units = 0;
     if (press_id) {
-      // Mark all existing active jobs for this press as completed
-      await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status = ?').bind('completed', press_id, 'active').run();
+      // Find prev_units from last job on this press
+      const lastJob = await db.prepare('SELECT color_count FROM jobs WHERE press_id = ? ORDER BY id DESC LIMIT 1').bind(press_id).first();
+      prev_units = lastJob ? lastJob.color_count : 0;
+
+      // Mark all existing active/setup jobs for this press as completed
+      await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status IN ("active", "setup", "andruck")').bind('completed', press_id).run();
     }
 
     const result = await db.prepare(
-      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, setup_target_min || 0).run();
+      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, setup_target_min || 0, prev_units).run();
 
     const newJobId = result.meta.last_row_id;
 
