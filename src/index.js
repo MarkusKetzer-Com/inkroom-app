@@ -1466,7 +1466,7 @@ app.get('/', (c) => {
             <span>🔧</span>
             <span data-en="Machine Status" data-tr="Maschinenstatus">Machine Status</span>
           </div>
-          <div class="recipe-toggle-row" id="nj-empty-row">
+          <div class="recipe-toggle-row" id="nj-empty-row" style="padding-right:0;">
             <div class="recipe-toggle-label">
               <span class="recipe-icon" style="background:#e3f2fd; color:#1565c0; border:1px solid #bbdefb;">M</span>
               <div>
@@ -1474,12 +1474,13 @@ app.get('/', (c) => {
                 <div class="recipe-toggle-hint" id="nj-prev-job-hint" data-en="Previous job on this press" data-tr="Bu makinedeki önceki iş">Previous job on this press</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span class="recipe-toggle-units" id="nj-prev-units-display">0</span>
-              <button class="toggle-pill" id="nj-empty-toggle" type="button" onclick="toggleMachineEmpty()"></button>
+            <div style="display:flex;align-items:center;background:var(--bg);border-radius:4px;border:1px solid var(--border);margin-right:12px;">
+              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-right:1px solid var(--border);border-radius:4px 0 0 4px;" onclick="adjustPrevUnits(-1)" type="button">-</button>
+              <span class="recipe-toggle-units" id="nj-prev-units-display" style="min-width:32px;text-align:center;font-weight:600;margin:0;">0</span>
+              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-left:1px solid var(--border);border-radius:0 4px 4px 0;" onclick="adjustPrevUnits(1)" type="button">+</button>
             </div>
           </div>
-          <div style="font-size:11px; padding:8px 12px 0; color:var(--text-tertiary);" id="nj-empty-label" data-en="Toggle ON = Machine was empty (prev units → 0)" data-tr="Açık = Makine boştu (önceki birimler → 0)">Toggle ON = Machine was empty (prev units → 0)</div>
+          <div style="font-size:11px; padding:8px 12px 0; color:var(--text-tertiary);" id="nj-empty-label" data-en="Adjust Out Units manually if machine was partially empty." data-tr="Makine kısmen boşsa Out Units (Çıkan İş) değerini ayarlayın.">Adjust Out Units manually if machine was partially empty.</div>
         </div>
 
         <div class="field" style="margin-top:16px;">
@@ -2050,9 +2051,7 @@ app.get('/', (c) => {
       
       // Setup Time Calculation: (Prev_Units * 1) + (New_Units * 2)
       var prevUnits = window._njPrevUnits || 0;
-      var isEmptyMachine = document.getElementById('nj-empty-toggle') && document.getElementById('nj-empty-toggle').classList.contains('active');
-      var effectivePrev = isEmptyMachine ? 0 : prevUnits;
-      var targetMin = (effectivePrev * 1) + (calc.total * 2);
+      var targetMin = (prevUnits * 1) + (calc.total * 2);
       document.getElementById('nj-setup-target').textContent = targetMin + ' Min';
       document.getElementById('nj-setup-target').setAttribute('data-val', targetMin);
 
@@ -2068,11 +2067,9 @@ app.get('/', (c) => {
       }
     }
 
-    function toggleMachineEmpty() {
-      var toggle = document.getElementById('nj-empty-toggle');
-      var row = document.getElementById('nj-empty-row');
-      toggle.classList.toggle('active');
-      row.classList.toggle('is-active');
+    function adjustPrevUnits(delta) {
+      window._njPrevUnits = Math.max(0, (window._njPrevUnits || 0) + delta);
+      document.getElementById('nj-prev-units-display').textContent = window._njPrevUnits;
       updatePrintUnitDisplay();
     }
 
@@ -2157,7 +2154,8 @@ app.get('/', (c) => {
             has_cmyk: calc.hasCmyk ? 1 : 0,
             has_varnish: calc.hasVarnish ? 1 : 0,
             print_units: calc.total,
-            setup_target_min: setupTargetMin
+            setup_target_min: setupTargetMin,
+            prev_units: window._njPrevUnits || 0
           })
         });
         var data = await res.json();
@@ -3455,16 +3453,20 @@ app.post('/api/jobs', async (c) => {
   }
 
   const body = await c.req.json();
-  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min } = body;
+  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units: req_prev_units } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
     try {
       let prev_units = 0;
-      if (press_id) {
-        // Find prev_units from last job on this press (prioritize REAL print_units, fallback to color_count)
+      if (typeof req_prev_units === 'number') {
+        prev_units = req_prev_units;
+      } else if (press_id) {
+        // Fallback: Find prev_units from last job on this press
         const lastJob = await db.prepare('SELECT print_units, color_count FROM jobs WHERE press_id = ? ORDER BY id DESC LIMIT 1').bind(press_id).first();
         prev_units = lastJob ? (lastJob.print_units || lastJob.color_count || 0) : 0;
+      }
 
+      if (press_id) {
         // Mark all existing active/setup jobs for this press as completed
         await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status IN ("active", "setup", "andruck")').bind('completed', press_id).run();
       }
