@@ -2093,6 +2093,67 @@ app.get('/', (c) => {
       } catch(e) { console.error('Sync failed:', e); }
     }
 
+    // ── Admin Pull State (survives re-renders) ────────────────────────────
+    var adminPullState = {}; // keyed by jobId: { waste: '', de: { cyan:'', magenta:'', ... } }
+
+    function getAdminState(jobId) {
+      if (!adminPullState[jobId]) adminPullState[jobId] = { waste: '', de: {} };
+      return adminPullState[jobId];
+    }
+
+    function adminDeChange(jobId, colorKey, value) {
+      getAdminState(jobId).de[colorKey] = value;
+    }
+
+    function adminWasteChange(jobId, value) {
+      getAdminState(jobId).waste = value;
+    }
+
+    async function submitAdminPull(jobId) {
+      var state = getAdminState(jobId);
+      var wasteVal = parseInt(state.waste) || 0;
+      var dePayload = {};
+      Object.keys(state.de).forEach(function(k) {
+        var v = parseFloat(state.de[k]);
+        if (!isNaN(v)) dePayload[k] = v;
+      });
+      try {
+        var res = await fetch('/api/jobs/' + jobId + '/admin-pull', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ waste_m: wasteVal, de: dePayload })
+        });
+        var result = await res.json();
+        if (res.ok) {
+          // Clear form state for next pull
+          adminPullState[jobId] = { waste: '', de: {} };
+          showToast(result.admin_out ? '⛔ Setup OUT — Budget überschritten!' : '✓ Pull gespeichert');
+          loadDashboard();
+        } else {
+          showToast('Fehler: ' + (result.error || 'Unbekannt'));
+        }
+      } catch(e) { showToast('Netzwerkfehler'); }
+    }
+
+    async function triggerFreigabe(jobId) {
+      if (!confirm(currentLang === 'tr' ? 'Üretim için serbest bırakmak istiyor musunuz?' : 'Freigabe für Produktion erteilen?')) return;
+      try {
+        var res = await fetch('/api/jobs/' + jobId + '/admin-freigabe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        if (res.ok) {
+          var r = await res.json();
+          showToast('✅ Freigabe erteilt! (' + r.splice_waste_added + 'm Splice-Abfall addiert)');
+          delete adminPullState[jobId];
+          loadDashboard();
+        } else {
+          showToast('Freigabe fehlgeschlagen');
+        }
+      } catch(e) { showToast('Netzwerkfehler'); }
+    }
+
     function toggleRecipe(type) {
       var toggle = document.getElementById('nj-' + type + '-toggle');
       var row = document.getElementById('nj-' + type + '-row');
@@ -3309,6 +3370,28 @@ app.get('/api/dashboard', async (c) => {
         });
         job.measurements.forEach(function(m) { if (!cmykNames.includes(m.color_name)) finalMeasurements.push(m); });
         job.measurements = finalMeasurements;
+        // Fetch admin pull history for this job (andruck or active)
+        if ((job.status === 'andruck' || job.status === 'active') && job.id) {
+          try {
+            const pullsResult = await db.prepare('SELECT * FROM admin_pulls WHERE job_id = ? ORDER BY pull_number').bind(job.id).all();
+            job.admin_pulls = pullsResult.results || [];
+          } catch(e) { job.admin_pulls = []; }
+          // Also pick up the admin columns from jobs
+          const adminJob = await db.prepare('SELECT admin_pull_count, admin_waste_m, admin_out, admin_done, admin_start_at FROM jobs WHERE id = ?').bind(job.id).first();
+          if (adminJob) {
+            job.admin_pull_count = adminJob.admin_pull_count || 0;
+            job.admin_waste_m    = adminJob.admin_waste_m    || 0;
+            job.admin_out        = adminJob.admin_out        || 0;
+            job.admin_done       = adminJob.admin_done       || 0;
+            job.admin_start_at   = adminJob.admin_start_at;
+          }
+        } else {
+          job.admin_pulls = [];
+          job.admin_pull_count = 0;
+          job.admin_waste_m = 0;
+          job.admin_out = 0;
+          job.admin_done = 0;
+        }
         jobsArr.push(job);
       }
       jobsArr.sort(function(a, b) { return b.id - a.id; });
@@ -3385,6 +3468,69 @@ app.post('/api/jobs/:id/action', async (c) => {
       return c.json({ ok: true });
     }
     return c.json({ error: 'Invalid action' }, 400);
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post('/api/jobs/:id/admin-pull', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  // body: { waste_m, de: { cyan, magenta, yellow, black, spot1..6 } }
+  const { waste_m = 0, de = {} } = body;
+  const now = new Date().toISOString();
+  try {
+    // Get current state
+    const job = await db.prepare('SELECT admin_pull_count, admin_waste_m, admin_start_at, first_pull_at FROM jobs WHERE id = ?').bind(id).first();
+    if (!job) return c.json({ error: 'Job not found' }, 404);
+
+    const pullCount    = (job.admin_pull_count || 0) + 1;
+    const newWaste     = (job.admin_waste_m    || 0) + (waste_m || 0);
+    const adminStart   = job.admin_start_at || job.first_pull_at || now;
+
+    // Evaluate OUT condition
+    const elapsedMs = new Date(now) - new Date(adminStart.endsWith('Z') ? adminStart : adminStart + 'Z');
+    const elapsedMin = elapsedMs / 60000;
+    const isOut = (newWaste > 1250) || (elapsedMin > 20);
+
+    // Insert clean relational pull record
+    await db.prepare(`INSERT INTO admin_pulls (job_id, pull_number, waste_m, de_cyan, de_magenta, de_yellow, de_black, de_spot1, de_spot2, de_spot3, de_spot4, de_spot5, de_spot6, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, pullCount, waste_m || 0, de.cyan ?? null, de.magenta ?? null, de.yellow ?? null, de.black ?? null,
+        de.spot1 ?? null, de.spot2 ?? null, de.spot3 ?? null, de.spot4 ?? null, de.spot5 ?? null, de.spot6 ?? null, now).run();
+
+    // Update job state
+    await db.prepare('UPDATE jobs SET admin_pull_count = ?, admin_waste_m = ?, admin_out = ?, admin_start_at = COALESCE(admin_start_at, ?), updated_at = ? WHERE id = ?')
+      .bind(pullCount, newWaste, isOut ? 1 : 0, adminStart, now, id).run();
+
+    return c.json({ ok: true, pull_number: pullCount, admin_waste_m: newWaste, admin_out: isOut });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post('/api/jobs/:id/admin-freigabe', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const now = new Date().toISOString();
+  try {
+    // Read system_settings for splice waste
+    let spliceWaste = 250;
+    try {
+      const settings = await db.prepare('SELECT splice_waste_m FROM system_settings WHERE id = 1').first();
+      if (settings) spliceWaste = settings.splice_waste_m || 250;
+    } catch(e) {}
+
+    // Add splice waste and mark admin as done
+    await db.prepare('UPDATE jobs SET admin_done = 1, admin_waste_m = admin_waste_m + ?, updated_at = ? WHERE id = ?')
+      .bind(spliceWaste, now, id).run();
+
+    // Transition to production (consistent state machine)
+    await db.prepare('UPDATE jobs SET status = ?, prod_start_at = ?, updated_at = ? WHERE id = ?')
+      .bind('active', now, now, id).run();
+
+    return c.json({ ok: true, splice_waste_added: spliceWaste });
   } catch(e) {
     return c.json({ error: e.message }, 500);
   }
@@ -3557,6 +3703,41 @@ app.post('/api/jobs', async (c) => {
   if (!jobsCols.includes('prev_units')) {
     try { await db.prepare(`ALTER TABLE jobs ADD COLUMN prev_units INTEGER DEFAULT 0`).run(); } catch(e) {}
   }
+  if (!jobsCols.includes('admin_pull_count')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN admin_pull_count INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('admin_waste_m')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN admin_waste_m INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('admin_out')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN admin_out INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('admin_done')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN admin_done INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('admin_start_at')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN admin_start_at TEXT`).run(); } catch(e) {}
+  }
+  // Create admin_pulls table for relational pull records
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS admin_pulls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL,
+      pull_number INTEGER NOT NULL,
+      waste_m INTEGER DEFAULT 0,
+      de_cyan REAL,
+      de_magenta REAL,
+      de_yellow REAL,
+      de_black REAL,
+      de_spot1 REAL,
+      de_spot2 REAL,
+      de_spot3 REAL,
+      de_spot4 REAL,
+      de_spot5 REAL,
+      de_spot6 REAL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+  } catch(e) {}
 
   const body = await c.req.json();
   const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units: req_prev_units } = body;

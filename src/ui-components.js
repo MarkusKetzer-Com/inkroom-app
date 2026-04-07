@@ -4,6 +4,28 @@
 export const renderJobCard = `
     function renderJobCard(job) {
       if (!job) return '';
+
+      // Helper: renders a single dE input row with a visual bar
+      function renderDeRow(jobId, colorKey, colorLabel, lastVal, colorHex) {
+        var swatchStyle = colorHex ? 'background:' + colorHex + '; border:0.5px solid rgba(0,0,0,0.1);' : 'background:#ccc;';
+        var isWhite = colorHex && (colorHex.toLowerCase() === '#ffffff' || colorHex.toLowerCase() === '#fff');
+        if (isWhite) swatchStyle += ' border:0.5px solid rgba(0,0,0,0.2);';
+        var inputId = 'admin-de-' + jobId + '-' + colorKey;
+        return '<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">' +
+          '<span style="width:9px; height:9px; border-radius:50%; flex-shrink:0; display:inline-block; ' + swatchStyle + '"></span>' +
+          '<span style="font-size:10px; color:var(--text-secondary); width:50px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + escapeHtml(colorLabel) + '">' + escapeHtml(colorLabel) + '</span>' +
+          '<div style="flex:1; position:relative;">' +
+            '<div style="position:relative; height:3px; background:rgba(0,0,0,0.06); border-radius:2px; margin-bottom:3px;">' +
+              '<div style="position:absolute; left:50%; top:-3px; width:1px; height:9px; background:rgba(0,0,0,0.2);"></div>' +
+              '<div style="position:absolute; right:0; top:-2px; width:1px; height:7px; background:#c62828; opacity:0.5;"></div>' +
+            '</div>' +
+          '</div>' +
+          '<input id="' + inputId + '" type="number" step="0.01" min="0" max="10" placeholder="dE" value="' + (lastVal !== '' && lastVal !== null ? lastVal : '') + '" ' +
+            'style="width:52px; padding:3px 5px; border:0.5px solid var(--border); border-radius:5px; font-size:11px; text-align:right; font-variant-numeric:tabular-nums;" ' +
+            'oninput="adminDeChange(' + jobId + ', \'' + colorKey + '\', this.value)">' +
+          '</div>';
+      }
+
       var measurements = job.measurements || [];
       var deVals = measurements.map(function(m) { return Number(m.de); }).filter(function(v) { return !isNaN(v); });
       var avgDe = deVals.length ? deVals.reduce(function(a, b) { return a + b; }, 0) / deVals.length : null;
@@ -111,17 +133,141 @@ export const renderJobCard = `
           </div>
         </div>
 
-        <!-- TILE 3: ADMIN 1 -->
-        <div class="cockpit-tile">
-          <div class="tile-title"><span>📝</span>\${isTR ? 'ADMIN 1' : 'ADMIN 1'}</div>
-          <div class="tile-placeholder">\${isTR ? 'Hazırlık bekleniyor...' : 'Waiting for setup...'}</div>
-        </div>
+        <!-- TILE 3: ADMIN 1 — Current Pull Form -->
+        \${(function() {
+          var adminPulls = job.admin_pulls || [];
+          var pullCount  = job.admin_pull_count || 0;
+          var adminDone  = job.admin_done;
+          var adminOut   = job.admin_out;
+          var inAdmin    = (status === 'andruck' || (status === 'active' && !adminDone));
 
-        <!-- TILE 4: ADMIN 2 -->
-        <div class="cockpit-tile">
-          <div class="tile-title"><span>⚡</span>\${isTR ? 'ADMIN 2' : 'ADMIN 2'}</div>
-          <div class="tile-placeholder">\${isTR ? 'Onay bekleniyor...' : 'Waiting for approval...'}</div>
-        </div>
+          if (!inAdmin && !adminDone) {
+            return '<div class="cockpit-tile"><div class="tile-title"><span>📝</span>ADMIN 1</div><div class="tile-placeholder">' + (isTR ? 'Setup bekleniyor...' : 'Awaiting setup start...') + '</div></div>';
+          }
+
+          if (adminDone) {
+            var lastPull = adminPulls[adminPulls.length - 1] || {};
+            return '<div class="cockpit-tile" style="border-color:rgba(29,115,36,0.3); background:rgba(29,115,36,0.04);">' +
+              '<div class="tile-title"><span>✅</span>ADMIN 1 — Freigegeben</div>' +
+              '<div style="font-size:12px; color:var(--text-secondary); margin-top:8px;">' + pullCount + ' Pull(s) · ' + (job.admin_waste_m || 0) + 'm Abfall (inkl. Splice)</div>' +
+              '</div>';
+          }
+
+          // Build dE input rows for each color
+          var jobColors = job.measurements || [];
+          var colorKeys = { cyan:'de_cyan', magenta:'de_magenta', yellow:'de_yellow', black:'de_black', spot1:'de_spot1', spot2:'de_spot2', spot3:'de_spot3', spot4:'de_spot4', spot5:'de_spot5', spot6:'de_spot6' };
+          var colorMap  = { cyan:'Cyan', magenta:'Magenta', yellow:'Yellow', black:'Black' };
+          var spotIdx = 1;
+          var deRowsHtml = '';
+
+          // Show CMYK if relevant
+          ['cyan','magenta','yellow','black'].forEach(function(k) {
+            var col = jobColors.find(function(m){ return m.color_name === colorMap[k]; });
+            if (col || (job.has_cmyk && ['cyan','magenta','yellow','black'].indexOf(k) >= 0)) {
+              // Last pull val
+              var lastVal = adminPulls.length > 0 ? (adminPulls[adminPulls.length-1][colorKeys[k]] || '') : '';
+              deRowsHtml += renderDeRow(job.id, k, colorMap[k], lastVal, col ? col.color_hex : null);
+            }
+          });
+
+          // Spot colors
+          jobColors.forEach(function(m){
+            if (['Cyan','Magenta','Yellow','Black'].indexOf(m.color_name) >= 0) return;
+            var spotKey = 'spot' + spotIdx;
+            spotIdx++;
+            if (spotIdx > 7) return;
+            var keyInDb = colorKeys[spotKey];
+            var lastVal = adminPulls.length > 0 ? (adminPulls[adminPulls.length-1][keyInDb] || '') : '';
+            deRowsHtml += renderDeRow(job.id, spotKey, m.color_name, lastVal, m.color_hex);
+          });
+
+          var currentPullNum = pullCount + 1;
+          return '<div class="cockpit-tile">' +
+            '<div class="tile-title"><span>📝</span>ADMIN PULL ' + currentPullNum + '</div>' +
+            '<div style="display:flex; flex-direction:column; gap:6px; flex:1;">' +
+            deRowsHtml +
+            '<div style="margin-top:auto; padding-top:8px; border-top:0.5px solid var(--border-subtle); display:flex; gap:8px;">' +
+            '<input id="admin-waste-' + job.id + '" type="number" placeholder="Waste (m)" min="0" style="flex:1; padding:6px 8px; border:0.5px solid var(--border); border-radius:6px; font-size:12px;" oninput="adminWasteChange(' + job.id + ', this.value)">' +
+            '<button style="background:var(--accent); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;" onclick="submitAdminPull(' + job.id + ')">Pull ' + currentPullNum + ' sichern ✓</button>' +
+            '</div>' +
+            '</div></div>';
+        })()}
+
+        <!-- TILE 4: ADMIN 2 — Freigabe / OUT -->
+        \${(function() {
+          var adminPulls  = job.admin_pulls || [];
+          var pullCount   = job.admin_pull_count || 0;
+          var adminOut    = job.admin_out;
+          var adminDone   = job.admin_done;
+          var wasteTotal  = job.admin_waste_m || 0;
+          var pullTimeMin = (window.systemSettings && window.systemSettings.pull_time_min) || 10;
+          var pullWasteM  = (window.systemSettings && window.systemSettings.pull_waste_m)  || 500;
+          var inAdmin     = (status === 'andruck' || (status === 'active' && !adminDone));
+
+          if (!inAdmin && !adminDone) {
+            return '<div class="cockpit-tile"><div class="tile-title"><span>⚡</span>ADMIN 2</div><div class="tile-placeholder">' + (isTR ? 'Onay bekleniyor...' : 'Waiting for approval...') + '</div></div>';
+          }
+
+          if (adminDone) {
+            return '<div class="cockpit-tile" style="border-color:rgba(29,115,36,0.3); background:rgba(29,115,36,0.04);">' +
+              '<div class="tile-title"><span>✅</span>ADMIN 2 — Freigegeben</div>' +
+              '<div style="font-size:13px; font-weight:700; color:#1a7326; margin-top:12px;">Produktion läuft ✅</div>' +
+              '</div>';
+          }
+
+          if (adminOut) {
+            return '<div class="cockpit-tile" style="border-color:#c62828; background:rgba(198,40,40,0.06);">' +
+              '<div class="tile-title" style="color:#c62828;"><span>⛔</span>SETUP OUT</div>' +
+              '<div style="font-size:13px; font-weight:700; color:#c62828; margin:12px 0 4px;">Budget überschritten!</div>' +
+              '<div style="font-size:11px; color:var(--text-secondary);">' + wasteTotal + 'm Abfall verbraucht</div>' +
+              '<div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">' + pullCount + ' Pulls durchgeführt</div>' +
+              '</div>';
+          }
+
+          if (pullCount < 1) {
+            return '<div class="cockpit-tile" style="opacity:0.5;"><div class="tile-title"><span>⚡</span>ADMIN 2</div><div class="tile-placeholder">Warte auf Pull 1...</div></div>';
+          }
+
+          // Budget bars
+          var elapsedMin = 0;
+          if (job.admin_start_at) {
+            var startMs = new Date(job.admin_start_at.endsWith('Z') ? job.admin_start_at : job.admin_start_at + 'Z');
+            elapsedMin = Math.round((new Date() - startMs) / 60000);
+          }
+          var timeBarPct  = Math.min(100, Math.round(elapsedMin  / pullTimeMin * 100));
+          var wasteBarPct = Math.min(100, Math.round(wasteTotal  / pullWasteM  * 100));
+          var timeColor   = timeBarPct  < 70 ? '#1a7326' : (timeBarPct  < 90 ? '#a35b00' : '#c62828');
+          var wasteColor  = wasteBarPct < 70 ? '#1a7326' : (wasteBarPct < 90 ? '#a35b00' : '#c62828');
+
+          // Show last pull's dE summary
+          var lastPull = adminPulls[adminPulls.length - 1] || {};
+          var deKeys   = ['de_cyan','de_magenta','de_yellow','de_black','de_spot1','de_spot2'];
+          var deLabels = ['C','M','Y','K','S1','S2'];
+          var deSummary = '';
+          deKeys.forEach(function(k, i) {
+            if (lastPull[k] != null) {
+              var v = Number(lastPull[k]);
+              var col = v < 2.0 ? '#1a7326' : '#c62828';
+              deSummary += '<span style="font-size:10px; font-weight:700; color:' + col + '; background:' + (v < 2.0 ? 'rgba(29,115,36,0.08)' : 'rgba(198,40,40,0.08)') + '; padding:2px 5px; border-radius:4px; margin:2px;">' + deLabels[i] + ': ' + v.toFixed(2) + '</span>';
+            }
+          });
+
+          return '<div class="cockpit-tile">' +
+            '<div class="tile-title"><span>⚡</span>ADMIN 2 — Pull ' + pullCount + ' Ergebnis</div>' +
+            (deSummary ? '<div style="display:flex; flex-wrap:wrap; gap:2px; margin-bottom:10px;">' + deSummary + '</div>' : '') +
+            '<div style="margin-bottom:8px;">' +
+              '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-tertiary); margin-bottom:3px;"><span>⏱ Zeit</span><span>' + elapsedMin + ' / ' + pullTimeMin + ' Min</span></div>' +
+              '<div style="height:5px; background:rgba(0,0,0,0.06); border-radius:3px;"><div style="height:100%; width:' + timeBarPct + '%; background:' + timeColor + '; border-radius:3px; transition:width 0.4s;"></div></div>' +
+            '</div>' +
+            '<div style="margin-bottom:12px;">' +
+              '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-tertiary); margin-bottom:3px;"><span>🗑 Abfall</span><span>' + wasteTotal + ' / ' + pullWasteM + ' m</span></div>' +
+              '<div style="height:5px; background:rgba(0,0,0,0.06); border-radius:3px;"><div style="height:100%; width:' + wasteBarPct + '%; background:' + wasteColor + '; border-radius:3px; transition:width 0.4s;"></div></div>' +
+            '</div>' +
+            '<div style="margin-top:auto; display:flex; gap:8px;">' +
+              '<button style="flex:1; background:#1a7326; color:#fff; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;" onclick="triggerFreigabe(' + job.id + ')">✅ Freigabe</button>' +
+            '</div>' +
+            '</div>';
+        })()}
 
         <!-- TILE 5: PROD PHASE -->
         <div class="cockpit-tile">
