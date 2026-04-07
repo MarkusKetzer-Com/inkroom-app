@@ -3449,8 +3449,12 @@ app.post('/api/jobs', async (c) => {
   if (!jobsCols.includes('setup_target_min')) {
     try { await db.prepare(`ALTER TABLE jobs ADD COLUMN setup_target_min INTEGER DEFAULT 0`).run(); } catch(e) {}
   }
+  if (!jobsCols.includes('prev_units')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN prev_units INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
 
   const body = await c.req.json();
+  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
   try {
