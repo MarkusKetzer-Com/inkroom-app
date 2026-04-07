@@ -689,8 +689,40 @@ app.get('/', (c) => {
     }
     .cockpit-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(3, auto);
       gap: 12px;
+      padding: 0;
+    }
+    .cockpit-tile {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-height: 120px;
+    }
+    .tile-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tile-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      font-style: italic;
+      flex: 1;
     }
     .cockpit-stat {
       display: flex;
@@ -1933,21 +1965,26 @@ app.get('/', (c) => {
         html += renderPerfBadge(perf.h24, currentLang === 'tr' ? '24s' : '24h');
         html += renderPerfBadge(perf.d7, currentLang === 'tr' ? '7g' : '7d');
         html += renderPerfBadge(perf.d30, currentLang === 'tr' ? '30g' : '30d');
-        html += '<button class="btn-ghost" style="padding:3px 12px;font-size:11px;" onclick="openNewJobModal(' + press.id + ')">+ ' + (currentLang === 'tr' ? 'Neuer Job' : 'New Job') + '</button>';
         html += '</div>';
         html += '</div>';
 
-        html += '<div class="press-row">';
+        html += '<div class="press-row" style="display:block;">';
 
         // Only show the most recent (current) job
         var jobs = press.jobs || [];
         if (jobs.length === 0) {
-          // No active job — show add card full width
-          var addLabel = currentLang === 'tr' ? 'Yeni is ekle' : 'Add new job';
-          html += '<div class="add-card" style="flex:1;max-width:none;min-height:200px;" onclick="openNewJobModal(' + press.id + ')">';
-          html += '<div class="add-icon-circle">+</div>';
-          html += '<span class="add-card-label">' + addLabel + '</span>';
-          html += '</div>';
+           // Case: No active job — still render the 6-tile grid with a "New Job" button in Tile 1
+           html += '<div class="cockpit-grid">';
+           html += '<div class="cockpit-tile">';
+           html += '<div class="tile-title"><span>📂</span>' + (currentLang === 'tr' ? 'İŞ BİLGİSİ' : 'JOB INFO') + '</div>';
+           html += '<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px 0;">';
+           html += '<span style="color:var(--text-tertiary); font-size:13px;">' + (currentLang === 'tr' ? 'Aktif iş yok' : 'No active job') + '</span>';
+           html += '<button class="btn-primary" style="width:100%;" onclick="openNewJobModal(' + press.id + ')">+ ' + (currentLang === 'tr' ? 'Yeni İş' : 'New Job') + '</button>';
+           html += '</div>';
+           html += '</div>';
+           // Add 5 placeholders to complete the grid
+           for(var i=0; i<5; i++) html += '<div class="cockpit-tile"><div class="tile-placeholder">Waiting for job...</div></div>';
+           html += '</div>';
         } else {
           var job = jobs[0]; // current/latest job
           jobsLookup[job.id] = job;
@@ -2030,6 +2067,30 @@ app.get('/', (c) => {
 
     function closeNewJobModal() {
       document.getElementById('new-job-overlay').classList.remove('open');
+    }
+
+    async function updateJobPrevUnits(jobId, delta) {
+      if (!jobId) return;
+      var job = jobsLookup[jobId];
+      if (!job) return;
+      
+      // Update local state instantly for UI responsiveness
+      job.prev_units = Math.max(0, (job.prev_units || 0) + delta);
+      // Recalculate target: (Out*1) + (In*2)
+      var inUnits = job.print_units || job.color_count || 0;
+      job.setup_target_min = (job.prev_units * 1) + (inUnits * 2);
+      
+      // Re-re-render only this job card (if needed, but simple re-dashboard works too)
+      renderDashboard(window._lastDashboardData);
+      
+      // Sync with server
+      try {
+        await fetch('/api/jobs/' + jobId + '/prev-units', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prev_units: job.prev_units })
+        });
+      } catch(e) { console.error('Sync failed:', e); }
     }
 
     function toggleRecipe(type) {
@@ -3338,6 +3399,19 @@ app.put('/api/jobs/:id/empty-machine', async (c) => {
   } catch(e) {
     return c.json({ error: e.message }, 500);
   }
+});
+
+app.put('/api/jobs/:id/prev-units', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { prev_units } = await c.req.json();
+  try {
+    const job = await db.prepare('SELECT print_units, color_count FROM jobs WHERE id = ?').bind(id).first();
+    const inUnits = job ? (job.print_units || job.color_count || 0) : 0;
+    const targetMin = (prev_units * 1) + (inUnits * 2);
+    await db.prepare('UPDATE jobs SET prev_units = ?, setup_target_min = ? WHERE id = ?').bind(prev_units, targetMin, id).run();
+    return c.json({ ok: true, setup_target_min: targetMin });
+  } catch(e) { return c.json({ error: e.message }, 500); }
 });
 
 app.put('/api/jobs/:id/performance', async (c) => {

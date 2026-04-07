@@ -3,6 +3,7 @@
 /** renderJobCard — Performance Cockpit card with benchmarks & traffic-light badges */
 export const renderJobCard = `
     function renderJobCard(job) {
+      if (!job) return '';
       var measurements = job.measurements || [];
       var deVals = measurements.map(function(m) { return Number(m.de); }).filter(function(v) { return !isNaN(v); });
       var avgDe = deVals.length ? deVals.reduce(function(a, b) { return a + b; }, 0) / deVals.length : null;
@@ -13,100 +14,6 @@ export const renderJobCard = `
       var measuredColors = measurements.length;
       var progressPct = expectedColors > 0 ? Math.min(100, Math.round(measuredColors / expectedColors * 100)) : 0;
 
-      var failingColors = measurements.filter(function(m) { return Number(m.de) >= 2.0; });
-      var isZeroPull = measurements.length > 0 && failingColors.length === 0;
-
-      var deBadgeHtml = avgDe != null ? '<span class="badge badge-' + avgTier + '">avg dE ' + avgDe.toFixed(2) + '</span>' : '';
-      var colorWord = isTR ? 'renk' : (measurements.length === 1 ? 'color' : 'colors');
-      var colorCountBadge = measurements.length ? '<span class="badge badge-neutral">' + measuredColors + (expectedColors > measuredColors ? '/' + expectedColors : '') + ' ' + colorWord + '</span>' : '';
-
-      // --- Build Recipe String ---
-      var recipeParts = [];
-      if (job.has_white) recipeParts.push('W');
-      if (job.has_cmyk) recipeParts.push('CMYK');
-      if (job.color_count > 0) recipeParts.push(job.color_count + 'S');
-      if (job.has_varnish) recipeParts.push('V');
-      var recipeStr = recipeParts.join(' + ');
-      var recipeBadgeHtml = recipeStr ? '<span class="badge badge-neutral" style="background:rgba(0,113,227,0.06); color:var(--accent); border:0.5px solid rgba(0,113,227,0.2);">' + recipeStr + '</span>' : '';
-
-      var tableHtml = '';
-      if (measurements.length === 0 && job.status === 'ready') {
-        tableHtml = '<div class="no-measurements">' + (isTR ? 'Hazırlık bekleniyor' : 'Waiting for setup') + '</div>';
-      } else {
-        // Local renderColorRow to handle SCTV-Delta cleanly within ui-components.js
-        var localRenderColorRow = function(c, jobId) {
-          var hex = c.color_hex || '#888888';
-          var isWhite = hex.toLowerCase() === '#ffffff' || hex.toLowerCase() === '#fff';
-          var swatchClass = 'swatch' + (isWhite ? ' swatch-white' : '');
-
-          var tierDE = getTier(Number(c.de));
-          var deClass = 'de-' + tierDE;
-          var deVal = c.de != null ? Number(c.de).toFixed(2) : '--.--';
-          var dsNum = Number(c.ds);
-          var dsVal = c.ds != null ? dsNum : '--.--';
-          var dsCls = (!isNaN(dsNum) && dsNum <= 100) ? 'density-warn' : '';
-          var dcNum = Number(c.delta_c);
-          var dcVal = c.delta_c != null ? (dcNum >= 0 ? '+' : '') + dcNum.toFixed(2) : '--.--';
-
-          var sctvCells = '';
-          var maxSctvDev = 0;
-          var hasSctv = false;
-          [5, 10, 25, 50, 75].forEach(function(targetPct) {
-            var val = c['sctv_' + targetPct];
-            if (val == null) {
-              sctvCells += '<td><span style="color:var(--text-tertiary);">--.--</span></td>';
-            } else {
-              hasSctv = true;
-              var num = Number(val);
-              var diff = num - targetPct;
-              var absDiff = Math.abs(diff);
-              if (absDiff > maxSctvDev) maxSctvDev = absDiff;
-              
-              var diffColor = absDiff <= 2.0 ? '#1a7326' : (absDiff <= 4.0 ? '#a35b00' : '#c62828');
-              var diffText = (diff >= 0 ? '+' : '') + diff.toFixed(1);
-              sctvCells += '<td style="line-height:1.1; vertical-align:top; border-bottom: 0.5px solid var(--border-subtle);">' + 
-                           '<div style="font-weight:500;">' + num.toFixed(1) + '</div>' + 
-                           '<div style="font-size:9px;font-weight:700;color:' + diffColor + '; margin-top:2px;">' + diffText + '</div></td>';
-            }
-          });
-
-          var tierTV = 'neutral';
-          if (hasSctv) tierTV = maxSctvDev <= 2.0 ? 'ok' : (maxSctvDev <= 4.0 ? 'warn' : 'crit');
-
-          var pillLabels = { ok: { en: 'OK', tr: 'TAMAM' }, warn: { en: 'Warn', tr: 'Uyari' }, action: { en: 'Action', tr: 'Eylem' }, crit: { en: 'Critical', tr: 'Kritik' }, neutral: { en: '-', tr: '-' } };
-          var pillTV = pillLabels[tierTV] ? (currentLang === 'tr' ? pillLabels[tierTV].tr : pillLabels[tierTV].en) : '-';
-          var pillDE = pillLabels[tierDE] ? (currentLang === 'tr' ? pillLabels[tierDE].tr : pillLabels[tierDE].en) : '-';
-
-          var safeColorName = (c.color_name || '').replace(/'/g, "\\\\'");
-          var safeHex = (hex || '').replace(/'/g, "\\\\'");
-          var sctvData = JSON.stringify({
-            sctv_5: c.sctv_5, sctv_10: c.sctv_10, sctv_25: c.sctv_25, sctv_50: c.sctv_50, sctv_75: c.sctv_75
-          }).replace(/"/g, '&quot;');
-          var clickAttr = jobId ? ' onclick="openCorrection(' + jobId + ", \\'" + safeColorName + "\\', \\'" + safeHex + "\\', \\'" + sctvData + "\\'" + ')" style="cursor:pointer;"' : '';
-
-          return '<tr class="color-row-clickable"' + clickAttr + '>' +
-            '<td><span class="' + swatchClass + '" style="background:' + hex + '"></span>' + escapeHtml(c.color_name || '-') + '</td>' +
-            '<td><span class="' + deClass + '">' + deVal + '</span></td>' +
-            '<td' + (dsCls ? ' class="' + dsCls + '"' : '') + '>' + dsVal + '</td>' +
-            '<td>' + dcVal + '</td>' + sctvCells +
-            '<td><span class="status-pill status-' + tierTV + '">' + pillTV + '</span></td>' +
-            '<td><span class="status-pill status-' + tierDE + '">' + pillDE + '</span></td>' +
-            '</tr>';
-        };
-
-        tableHtml = '<div class="table-responsive"><table><thead><tr>' +
-          '<th>' + (isTR ? 'Renk' : 'Color') + '</th>' +
-          '<th title="Delta E (Color Difference)">dE</th>' +
-          '<th title="Density / Solid">D/S (%)</th>' +
-          '<th title="Chroma Difference">dC*</th>' +
-          '<th>5%</th><th>10%</th><th>25%</th><th>50%</th><th>75%</th>' +
-          '<th title="Tone Value Status">' + (isTR ? 'Status TV' : 'Status TV') + '</th>' +
-          '<th title="Delta E Status">' + (isTR ? 'Status dE' : 'Status dE') + '</th>' +
-          '</tr></thead><tbody>';
-        measurements.forEach(function(m) { tableHtml += localRenderColorRow(m, job.id); });
-        tableHtml += '</tbody></table></div>';
-      }
-
       var unitsTarget = job.target_units || 0;
       var unitsActual = job.curr_units || 0;
       var wasteTotal = job.actual_waste || 0;
@@ -114,7 +21,7 @@ export const renderJobCard = `
       var prodPct = unitsTarget > 0 ? Math.min(100, Math.round(unitsActual / unitsTarget * 100)) : 0;
       var wastePct = unitsActual > 0 ? (wasteTotal / unitsActual * 100).toFixed(1) : '0.0';
 
-      // ── Benchmark Targets ─────────────────────────────────────────────────
+      // ── MECH Logic ────────────────────────────────────────────────────────
       var prevUnits = job.prev_units || 0;
       var newUnits = job.print_units || job.color_count || 0;
       var prevMin = prevUnits * 1;
@@ -128,106 +35,6 @@ export const renderJobCard = `
       };
       var msToMin = function(ms) { return ms / 60000; };
       
-      var isTR = currentLang === 'tr';
-
-      var splitTargetInfo = '<div style="font-size:10px; color:var(--text-tertiary); margin-top:8px; padding:6px 10px; background:rgba(0,0,0,0.02); border-radius:4px; display:inline-flex; gap:12px; align-items:center;">' +
-        '<span title="' + (isTR ? 'Önceki İş' : 'Vorheriger Job') + '"><strong>' + (isTR ? 'Out:' : 'Out:') + '</strong> ' + prevUnits + ' Unit (' + prevMin + 'min)</span>' +
-        '<span title="' + (isTR ? 'Yeni İş' : 'Neuer Job') + '"><strong>' + (isTR ? 'In:' : 'In:') + '</strong> ' + newUnits + ' Unit (' + newMin + 'min)</span>' +
-        '<span style="color:var(--accent); font-weight:600;">' + (isTR ? 'Hedef:' : 'Goal:') + ' ' + mechTargetMin + ' Min</span>' +
-        '</div>';
-
-      // ── Action Buttons & Timer Setup ──────────────────────────────────────
-      var actionBtnHtml = '';
-      var status = job.job_status || job.status || 'ready';
-      
-      // FIX: Newly created jobs currently default to status 'active' due to DB schema.
-      // If a job is 'active' but has absolutely no timestamps, it's a new job, not in production yet!
-      if (status === 'active' && !job.setup_start_at && !job.first_pull_at && !job.prod_start_at) {
-        status = 'ready';
-      }
-
-      var startTime = null;
-      var timerPrefix = '';
-      var targetInfo = '';
-
-      if (status === 'ready') {
-        actionBtnHtml = '<button class="btn-action-main" onclick="handleJobAction(' + job.id + ', \\'start-setup\\')">▶ ' + (isTR ? 'Setup Başlat' : 'Start Setup') + '</button>';
-        targetInfo = splitTargetInfo;
-      } else if (status === 'setup') {
-        startTime = job.setup_start_at;
-        timerPrefix = 'Setup: ';
-        targetInfo = splitTargetInfo;
-        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
-      } else if (status === 'andruck') {
-        startTime = job.first_pull_at;
-        timerPrefix = 'Andruck: ';
-        targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Admin-Ziel: 10 Min</span>';
-        var setupModalTitle = isTR ? 'Kurulum Verileri' : 'Setup Metrics';
-        actionBtnHtml = '<button class="btn-action-main state-andruck" onclick="openMetricsModal(' + job.id + ', \\'' + setupModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'start-prod\\')">⚡ ' + (isTR ? 'Üretimi Başlat' : 'Start Production') + '</button>';
-      } else if (status === 'active') {
-        startTime = job.prod_start_at;
-        timerPrefix = 'Prod: ';
-        var prodModalTitle = isTR ? 'Üretim Verileri' : 'Production Metrics';
-        var finishModalTitle = isTR ? 'İşi Bitir' : 'Finish Job';
-        actionBtnHtml = '<button class="btn-action-main state-active" onclick="openMetricsModal(' + job.id + ', \\'' + prodModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'\\')">📊 ' + (isTR ? 'Veri Gir' : 'Enter Metrics') + '</button>';
-        actionBtnHtml += '<button class="btn-action-sec" onclick="openMetricsModal(' + job.id + ', \\'' + finishModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'complete\\')">Finish</button>';
-      }
-
-      // ── Traffic-Light Badges (MECH / ADMIN / PROD) ────────────────────────
-      var bs = 'display:inline-block;font-size:9px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:4px;margin-left:4px;';
-      var mechBadgeHtml = '', adminBadgeHtml = '', prodBadgeHtml = '';
-
-      // Default persistent badges (pill style, neutral color)
-      var mechDef = '<span style="' + bs + 'background:rgba(0,0,0,0.06);color:#86868b;">MECH</span>';
-      var adminDef = '<span style="' + bs + 'background:rgba(0,0,0,0.06);color:#86868b;">ADMIN</span>';
-      var prodDef = '<span style="' + bs + 'background:rgba(0,0,0,0.06);color:#86868b;">PROD</span>';
-
-      if (status !== 'ready' && job.setup_start_at) {
-        var setupStart = tsToDate(job.setup_start_at);
-        var setupEnd = job.first_pull_at ? tsToDate(job.first_pull_at) : new Date();
-        var setupMin = msToMin(setupEnd - setupStart);
-        var mechOk = setupMin <= (mechTargetMin || 20);
-        mechBadgeHtml = '<span style="' + bs + 'background:' + (mechOk ? '#1a7326' : '#c62828') + ';color:#fff;" title="Setup: ' + Math.round(setupMin) + ' Min / Ziel: ' + mechTargetMin + ' Min">MECH</span>';
-      } else {
-        mechBadgeHtml = mechDef;
-      }
-
-      if ((status === 'andruck' || status === 'active') && job.first_pull_at) {
-        var fpStart = tsToDate(job.first_pull_at);
-        var fpEnd = job.prod_start_at ? tsToDate(job.prod_start_at) : new Date();
-        var adminMin = msToMin(fpEnd - fpStart);
-        var adminOk = stopsTotal <= 2 && wasteTotal <= 1000 && adminMin <= 20;
-        adminBadgeHtml = '<span style="' + bs + 'background:' + (adminOk ? '#1a7326' : '#c62828') + ';color:#fff;" title="Stopps: ' + stopsTotal + ', Mak: ' + wasteTotal + ', Zeit: ' + Math.round(adminMin) + ' Min">ADMIN</span>';
-      } else {
-        adminBadgeHtml = adminDef;
-      }
-
-      if (status === 'active' && job.prod_start_at) {
-        var prodStart = tsToDate(job.prod_start_at);
-        var prodMin = msToMin(new Date() - prodStart);
-        var speed = prodMin > 0 ? Math.round(unitsActual / prodMin) : 0;
-        var prodColor = speed >= 300 ? '#1a7326' : (speed >= 200 ? '#a35b00' : '#c62828');
-        prodBadgeHtml = '<span style="' + bs + 'background:' + prodColor + ';color:#fff;" title="Geschwindigkeit: ' + speed + ' m/min">PROD ' + (speed > 0 ? speed : '—') + '</span>';
-      } else {
-        prodBadgeHtml = prodDef;
-      }
-
-      var timerHtml = '';
-      if (startTime) {
-        var targetMinVal = null;
-        if (status === 'setup' && mechTargetMin) targetMinVal = mechTargetMin;
-        else if (status === 'andruck') targetMinVal = 10;
-        
-        var targetAttr = targetMinVal ? ' data-target-min="' + targetMinVal + '"' : '';
-        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '"' + targetAttr + '>00:00:00</span>';
-        if (targetInfo) timerHtml += '<div>' + targetInfo + '</div>';
-      } else if (status === 'ready') {
-        timerHtml = '<span style="color:var(--text-secondary); font-size:13px;">' + (isTR ? 'Hazırlık Bekleniyor' : 'Awaiting Setup') + '</span>';
-        if (targetInfo) timerHtml += '<div>' + targetInfo + '</div>';
-      } else {
-        timerHtml = '-';
-      }
-
       var statusMap = {
         'ready': isTR ? 'HAZIRLIK BEKLENİYOR' : 'SETUP INITIATED',
         'setup': isTR ? 'KALİBRASYON' : 'CALIBRATING',
@@ -235,19 +42,100 @@ export const renderJobCard = `
         'active': isTR ? 'ÜRETİMDE' : 'IN PRODUCTION',
         'completed': isTR ? 'TAMAMLANDI' : 'COMPLETED'
       };
+      var status = job.job_status || job.status || 'ready';
+      if (status === 'active' && !job.setup_start_at && !job.first_pull_at && !job.prod_start_at) status = 'ready';
       var headerStatus = statusMap[status] || status.toUpperCase();
 
-      var formatK = function(num) {
-        if (num >= 1000) return (num/1000).toFixed(1).replace('.0','') + 'k';
-        return num.toString();
-      };
+      var timerHtml = '';
+      var startTime = null;
+      if (status === 'setup') startTime = job.setup_start_at;
+      else if (status === 'andruck') startTime = job.first_pull_at;
+      else if (status === 'active') startTime = job.prod_start_at;
 
-      return \`<div class="card">
-        <div class="card-head">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-            <div style="flex:1;">
-               <div style="font-size:10px; font-weight:600; color:var(--text-secondary); letter-spacing:0.04em; margin-bottom:6px; text-transform:uppercase;">
-                 JOB-\${escapeHtml(job.job_number || '')} <span style="margin:0 6px; color:var(--text-tertiary);">|</span> Status: <span style="color:var(--text-primary);">\${headerStatus}</span>
+      if (startTime) {
+        var tTarget = (status === 'setup') ? mechTargetMin : (status === 'andruck' ? 10 : null);
+        var tAttr = tTarget ? ' data-target-min="' + tTarget + '"' : '';
+        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '"' + tAttr + '>00:00</span>';
+      }
+
+      var actionBtnLabel = (status === 'ready') ? (isTR ? 'Setup Başlat' : 'Start Setup') :
+                          (status === 'setup') ? (isTR ? 'İlk Çekim' : 'First Pull') :
+                          (status === 'andruck') ? (isTR ? 'Üretime Başla' : 'Start Prod') : (isTR ? 'Veri Gir' : 'Metrics');
+      
+      var actionFn = (status === 'ready') ? 'handleJobAction(' + job.id + ', \\'start-setup\\')' :
+                     (status === 'setup') ? 'handleJobAction(' + job.id + ', \\'first-pull\\')' :
+                     'openMetricsModal(' + job.id + ', \\'Metrics\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'\\')';
+
+      return \`<div class="cockpit-grid">
+        <!-- TILE 1: JOB INFO -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>📂</span>\${isTR ? 'İŞ BİLGİSİ' : 'JOB INFO'}</div>
+          <div style="font-size:16px; font-weight:700; margin-bottom:4px;">\${escapeHtml(job.job_number || '')}</div>
+          <div style="font-size:13px; font-weight:500; color:var(--text-secondary); margin-bottom:12px; line-height:1.2; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+            \${escapeHtml(job.job_title || '')}
+          </div>
+          <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+            <div class="badge badge-neutral" style="text-align:center; padding:4px;">\${headerStatus}</div>
+            <button class="btn-primary" style="width:100%; border-radius:8px;" onclick="openNewJobModal(\${job.press_id})">+ \${isTR ? 'Yeni İş' : 'New Job'}</button>
+          </div>
+        </div>
+
+        <!-- TILE 2: MECH PHASE -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>🔧</span>\${isTR ? 'MECH SETUP' : 'MECH PHASE'}</div>
+          <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; color:var(--text-secondary);">Out Units:</span>
+              <div style="display:flex; align-items:center; background:var(--bg); border:0.5px solid var(--border); border-radius:6px; overflow:hidden;">
+                <button style="padding:2px 8px; border:none; background:none; cursor:pointer; font-size:16px; border-right:0.5px solid var(--border);" onclick="updateJobPrevUnits(\${job.id}, -1)">-</button>
+                <span style="min-width:30px; text-align:center; font-weight:700; font-size:13px;">\${prevUnits}</span>
+                <button style="padding:2px 8px; border:none; background:none; cursor:pointer; font-size:16px; border-left:0.5px solid var(--border);" onclick="updateJobPrevUnits(\${job.id}, 1)">+</button>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; color:var(--text-secondary);">In Units:</span>
+              <span style="font-weight:700; font-size:14px;">\${newUnits}</span>
+            </div>
+            <div style="margin-top:auto; padding-top:10px; border-top:0.5px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; flex-direction:column;">
+                <span style="font-size:10px; font-weight:600; color:var(--text-tertiary);">GOAL</span>
+                <span style="color:var(--accent); font-weight:800; font-size:16px;">\${mechTargetMin} Min</span>
+              </div>
+              <div style="text-align:right;">
+                \${timerHtml ? '<div style="font-size:10px; font-weight:600; color:var(--text-tertiary);">TIMER</div>' + timerHtml : ''}
+              </div>
+            </div>
+            <button class="btn-action-main \${status === 'setup' ? 'state-setup' : ''}" style="margin-top:4px; font-size:12px; border-radius:8px; padding:8px;" onclick="\${actionFn}">
+              \${actionBtnLabel}
+            </button>
+          </div>
+        </div>
+
+        <!-- TILE 3: ADMIN 1 -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>📝</span>\${isTR ? 'ADMIN 1' : 'ADMIN 1'}</div>
+          <div class="tile-placeholder">\${isTR ? 'Hazırlık bekleniyor...' : 'Waiting for setup...'}</div>
+        </div>
+
+        <!-- TILE 4: ADMIN 2 -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>⚡</span>\${isTR ? 'ADMIN 2' : 'ADMIN 2'}</div>
+          <div class="tile-placeholder">\${isTR ? 'Onay bekleniyor...' : 'Waiting for approval...'}</div>
+        </div>
+
+        <!-- TILE 5: PROD PHASE -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>🚀</span>\${isTR ? 'PROD ANALİZ' : 'PROD PHASE'}</div>
+          <div class="tile-placeholder">\${isTR ? 'Üretim bekleniyor...' : 'Waiting for production...'}</div>
+        </div>
+
+        <!-- TILE 6: SUMMARY -->
+        <div class="cockpit-tile">
+          <div class="tile-title"><span>🏁</span>\${isTR ? 'ÖZET' : 'SUMMARY'}</div>
+          <div class="tile-placeholder">\${isTR ? 'İş sonucu...' : 'Job result...'}</div>
+        </div>
+      </div>\`;
+    }
                </div>
                <div class="job-title" style="margin-bottom:0; font-size:16px;">\${escapeHtml(job.job_title || '')}</div>
             </div>
