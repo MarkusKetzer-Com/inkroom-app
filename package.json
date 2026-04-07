@@ -9,6 +9,7 @@
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:preview2": "wrangler deploy --env preview2",
     "deploy:preview3": "wrangler deploy --env preview3",
+    "deploy:preview4": "wrangler deploy --env preview4",
     "cf-typegen": "wrangler types",
     "test": "playwright test"
   },

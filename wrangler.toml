@@ -27,3 +27,10 @@ name = "preview3-inkroom-app"
 binding = "DB"
 database_name = "inkroom-db"
 database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
+
+[env.preview4]
+name = "preview4-inkroom-app"
+[[env.preview4.d1_databases]]
+binding = "DB"
+database_name = "inkroom-db"
+database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
