@@ -1379,6 +1379,29 @@ app.get('/', (c) => {
       <div class="modal-body">
         <input type="hidden" id="nj-press-id" value="">
         <input type="hidden" id="nj-max-colors" value="8">
+        <!-- Units In Use (Previous Job) -->
+        <div class="recipe-section" id="nj-machine-status" style="margin-bottom:16px; margin-top:0;">
+          <div class="recipe-section-title">
+            <span>🔧</span>
+            <span data-en="Units in use" data-tr="Kullanımdaki Üniteler">Units in use</span>
+          </div>
+          <div class="recipe-toggle-row" id="nj-empty-row" style="padding-right:0;">
+            <div class="recipe-toggle-label">
+              <span class="recipe-icon" style="background:#e3f2fd; color:#1565c0; border:1px solid #bbdefb;">M</span>
+              <div>
+                <div id="nj-prev-job-info" data-en="Loading..." data-tr="Yükleniyor...">Loading...</div>
+                <div class="recipe-toggle-hint" id="nj-prev-job-hint" data-en="Previous job on this press" data-tr="Bu makinedeki önceki iş">Previous job on this press</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;background:var(--bg);border-radius:4px;border:1px solid var(--border);margin-right:12px;">
+              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-right:1px solid var(--border);border-radius:4px 0 0 4px;" onclick="adjustPrevUnits(-1)" type="button">-</button>
+              <span class="recipe-toggle-units" id="nj-prev-units-display" style="min-width:32px;text-align:center;font-weight:600;margin:0;">0</span>
+              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-left:1px solid var(--border);border-radius:0 4px 4px 0;" onclick="adjustPrevUnits(1)" type="button">+</button>
+            </div>
+          </div>
+          <div style="font-size:11px; padding:8px 12px 0; color:var(--text-tertiary);" id="nj-empty-label" data-en="Adjust Out Units manually if machine was partially empty." data-tr="Makine kısmen boşsa Out Units (Çıkan İş) değerini ayarlayın.">Adjust Out Units manually if machine was partially empty.</div>
+        </div>
+
         <div class="field">
           <label data-en="Job Number" data-tr="İş Numarası">Job Number</label>
           <input type="text" id="nj-number" placeholder="e.g. JOB-2024-001">
@@ -1460,28 +1483,7 @@ app.get('/', (c) => {
           </div>
         </div>
 
-        <!-- Machine Status (Previous Job) -->
-        <div class="recipe-section" id="nj-machine-status" style="margin-top:12px;">
-          <div class="recipe-section-title">
-            <span>🔧</span>
-            <span data-en="Machine Status" data-tr="Maschinenstatus">Machine Status</span>
-          </div>
-          <div class="recipe-toggle-row" id="nj-empty-row" style="padding-right:0;">
-            <div class="recipe-toggle-label">
-              <span class="recipe-icon" style="background:#e3f2fd; color:#1565c0; border:1px solid #bbdefb;">M</span>
-              <div>
-                <div id="nj-prev-job-info" data-en="Loading..." data-tr="Yükleniyor...">Loading...</div>
-                <div class="recipe-toggle-hint" id="nj-prev-job-hint" data-en="Previous job on this press" data-tr="Bu makinedeki önceki iş">Previous job on this press</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;background:var(--bg);border-radius:4px;border:1px solid var(--border);margin-right:12px;">
-              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-right:1px solid var(--border);border-radius:4px 0 0 4px;" onclick="adjustPrevUnits(-1)" type="button">-</button>
-              <span class="recipe-toggle-units" id="nj-prev-units-display" style="min-width:32px;text-align:center;font-weight:600;margin:0;">0</span>
-              <button class="btn-ghost" style="padding:4px 10px;font-size:16px;border-left:1px solid var(--border);border-radius:0 4px 4px 0;" onclick="adjustPrevUnits(1)" type="button">+</button>
-            </div>
-          </div>
-          <div style="font-size:11px; padding:8px 12px 0; color:var(--text-tertiary);" id="nj-empty-label" data-en="Adjust Out Units manually if machine was partially empty." data-tr="Makine kısmen boşsa Out Units (Çıkan İş) değerini ayarlayın.">Adjust Out Units manually if machine was partially empty.</div>
-        </div>
+
 
         <div class="field" style="margin-top:16px;">
           <label data-en="Target Quantity" data-tr="Zielmenge">Target Quantity</label>
@@ -2100,7 +2102,7 @@ app.get('/', (c) => {
             return;
           }
         }
-        infoEl.textContent = currentLang === 'tr' ? 'Makine boş (ilk iş)' : 'Machine empty (first job)';
+        infoEl.textContent = currentLang === 'tr' ? 'Kullanımdaki Üniteler' : 'Units in use';
         hintEl.textContent = '';
         unitsEl.textContent = '0';
       } catch(e) {
