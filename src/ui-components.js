@@ -120,7 +120,7 @@ export const renderJobCard = `
       var prevMin = prevUnits * 1;
       var newMin = newUnits * 2;
       var calculatedTarget = prevMin + newMin;
-      var mechTargetMin = job.setup_target_min > 0 ? job.setup_target_min : calculatedTarget;
+      var mechTargetMin = Math.max(2, calculatedTarget);
 
       var tsToDate = function(ts) {
         if (!ts) return null;

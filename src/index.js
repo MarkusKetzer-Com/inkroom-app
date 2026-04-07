@@ -3458,20 +3458,23 @@ app.post('/api/jobs', async (c) => {
   const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
-  try {
-    let prev_units = 0;
-    if (press_id) {
-      // Find prev_units from last job on this press
-      const lastJob = await db.prepare('SELECT color_count FROM jobs WHERE press_id = ? ORDER BY id DESC LIMIT 1').bind(press_id).first();
-      prev_units = lastJob ? lastJob.color_count : 0;
+    try {
+      let prev_units = 0;
+      if (press_id) {
+        // Find prev_units from last job on this press (prioritize REAL print_units, fallback to color_count)
+        const lastJob = await db.prepare('SELECT print_units, color_count FROM jobs WHERE press_id = ? ORDER BY id DESC LIMIT 1').bind(press_id).first();
+        prev_units = lastJob ? (lastJob.print_units || lastJob.color_count || 0) : 0;
 
-      // Mark all existing active/setup jobs for this press as completed
-      await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status IN ("active", "setup", "andruck")').bind('completed', press_id).run();
-    }
+        // Mark all existing active/setup jobs for this press as completed
+        await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status IN ("active", "setup", "andruck")').bind('completed', press_id).run();
+      }
 
-    const result = await db.prepare(
-      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, setup_target_min || 0, prev_units).run();
+      // Backend calculation of target_min to ensure formula integrity: (Out * 1min) + (In * 2min)
+      const final_setup_target = (prev_units * 1) + ((print_units || 0) * 2);
+
+      const result = await db.prepare(
+        `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, final_setup_target, prev_units).run();
 
     const newJobId = result.meta.last_row_id;
 
