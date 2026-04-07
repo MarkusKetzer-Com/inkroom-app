@@ -87,7 +87,7 @@ export const renderJobCard = `
       var actionFn = (status === 'ready') ? "handleJobAction(" + job.id + ", 'start-setup')" :
                      (status === 'setup') ? "handleJobAction(" + job.id + ", 'first-pull')" :
                      (status === 'andruck') ? "handleJobAction(" + job.id + ", 'start-prod')" :
-                     "openMetricsModal(" + job.id + ", 'Metrics', " + unitsActual + ", " + wasteTotal + ", " + stopsTotal + ", ''");
+                     "openMetricsModal(" + job.id + ", 'Metrics', " + unitsActual + ", " + wasteTotal + ", " + stopsTotal + ", '')";
 
 
       return \`<div class="cockpit-grid">
