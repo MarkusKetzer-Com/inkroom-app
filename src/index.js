@@ -3187,7 +3187,8 @@ app.get('/api/dashboard', async (c) => {
             id: r.job_id, job_number: r.job_number, job_title: r.job_title,
             print_method: r.print_method, color_count: r.color_count, status: r.job_status,
             setup_start_at: r.setup_start_at, first_pull_at: r.first_pull_at, prod_start_at: r.prod_start_at,
-            curr_units: r.curr_units, target_units: r.target_units, actual_stops: r.actual_stops,
+            prev_units: r.prev_units, print_units: r.print_units, curr_units: r.curr_units, 
+            target_units: r.target_units, actual_stops: r.actual_stops,
             actual_waste: r.actual_waste, setup_target_min: r.setup_target_min, measurements: []
           };
         }
