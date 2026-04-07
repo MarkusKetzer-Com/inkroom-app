@@ -20,6 +20,15 @@ export const renderJobCard = `
       var colorWord = isTR ? 'renk' : (measurements.length === 1 ? 'color' : 'colors');
       var colorCountBadge = measurements.length ? '<span class="badge badge-neutral">' + measuredColors + (expectedColors > measuredColors ? '/' + expectedColors : '') + ' ' + colorWord + '</span>' : '';
 
+      // --- Build Recipe String ---
+      var recipeParts = [];
+      if (job.has_white) recipeParts.push('W');
+      if (job.has_cmyk) recipeParts.push('CMYK');
+      if (job.color_count > 0) recipeParts.push(job.color_count + 'S');
+      if (job.has_varnish) recipeParts.push('V');
+      var recipeStr = recipeParts.join(' + ');
+      var recipeBadgeHtml = recipeStr ? '<span class="badge badge-neutral" style="background:rgba(0,113,227,0.06); color:var(--accent); border:0.5px solid rgba(0,113,227,0.2);">' + recipeStr + '</span>' : '';
+
       var tableHtml = '';
       if (measurements.length === 0 && job.status === 'ready') {
         tableHtml = '<div class="no-measurements">' + (isTR ? 'Hazırlık bekleniyor' : 'Waiting for setup') + '</div>';
@@ -191,7 +200,12 @@ export const renderJobCard = `
 
       var timerHtml = '';
       if (startTime) {
-        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '">00:00:00</span>' + targetInfo;
+        var targetMinVal = null;
+        if (status === 'setup' && job.setup_target_min) targetMinVal = job.setup_target_min;
+        else if (status === 'andruck') targetMinVal = 10;
+        
+        var targetAttr = targetMinVal ? ' data-target-min="' + targetMinVal + '"' : '';
+        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '"' + targetAttr + '>00:00:00</span>' + targetInfo;
       } else if (status === 'ready') {
         timerHtml = '<span style="color:var(--text-secondary);">' + (isTR ? 'Hazırlık Hedefi: ' : 'Setup Goal: ') + mechTargetMin + ' Min</span>';
       } else {
@@ -225,7 +239,7 @@ export const renderJobCard = `
                <div style="width:30px; height:30px; background:var(--surface); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600;">\${prodPct}%</div>
             </div>
           </div>
-          <div class="badges">\${deBadgeHtml}\${colorCountBadge}\${mechBadgeHtml}\${adminBadgeHtml}\${prodBadgeHtml}</div>
+          <div class="badges">\${deBadgeHtml}\${colorCountBadge}\${recipeBadgeHtml}\${mechBadgeHtml}\${adminBadgeHtml}\${prodBadgeHtml}</div>
         </div>
         <div class="cockpit-section">
           <!-- Row 1: Production Units & Progress -->
@@ -322,13 +336,34 @@ export const renderTimer = `
         var startStr = el.getAttribute('data-start');
         if (!startStr) return;
         var start = new Date(startStr.endsWith('Z') ? startStr : startStr + 'Z');
+        var targetMin = el.getAttribute('data-target-min');
         var now = new Date();
-        var diff = Math.floor((now - start) / 1000);
-        if (diff < 0) diff = 0;
-        var h = Math.floor(diff / 3600);
-        var m = Math.floor((diff % 3600) / 60);
-        var s = diff % 60;
-        el.textContent = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        var elapsed = Math.floor((now - start) / 1000);
+        
+        var displayStr = "";
+        var isNegative = false;
+
+        if (targetMin) {
+          var targetSec = parseInt(targetMin) * 60;
+          var remaining = targetSec - elapsed;
+          if (remaining < 0) {
+            isNegative = true;
+            remaining = Math.abs(remaining);
+            el.style.color = "#c62828"; // Red
+          } else {
+            el.style.color = "#0071e3"; // Accent blue
+          }
+          var m = Math.floor(remaining / 60);
+          var s = remaining % 60;
+          displayStr = (isNegative ? "-" : "") + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        } else {
+          if (elapsed < 0) elapsed = 0;
+          var h = Math.floor(elapsed / 3600);
+          var m = Math.floor((elapsed % 3600) / 60);
+          var s = elapsed % 60;
+          displayStr = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        }
+        el.textContent = displayStr;
       });
     }
     setInterval(renderTimer, 1000);

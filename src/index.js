@@ -1150,6 +1150,187 @@ app.get('/', (c) => {
       .sctv-field label { font-size: 8px; }
     }
 
+    /* ── Recipe Builder Toggles ──────────────────────────── */
+    .recipe-section {
+      margin-bottom: 20px;
+    }
+    .recipe-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .recipe-toggles {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .recipe-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.02);
+      border: 0.5px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      transition: all 0.15s;
+    }
+    .recipe-toggle-row:hover {
+      background: rgba(0,0,0,0.04);
+    }
+    .recipe-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .recipe-toggle-label .recipe-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .recipe-icon-white {
+      background: #f5f5f5;
+      border: 1px solid rgba(0,0,0,0.15);
+      color: #999;
+    }
+    .recipe-icon-cmyk {
+      background: linear-gradient(135deg, #00a3e0, #e9008c, #ffed00, #1d1d1f);
+      color: #fff;
+      font-size: 9px;
+      letter-spacing: -0.03em;
+    }
+    .recipe-toggle-hint {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 1px;
+    }
+    .toggle-pill {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      border-radius: 13px;
+      background: rgba(0,0,0,0.12);
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      border: none;
+      padding: 0;
+    }
+    .toggle-pill.active {
+      background: #34c759;
+    }
+    .toggle-pill::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .toggle-pill.active::after {
+      transform: translateX(18px);
+    }
+    .recipe-toggle-units {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      min-width: 30px;
+      text-align: right;
+      margin-right: 8px;
+      transition: color 0.2s;
+    }
+    .recipe-toggle-row.is-active .recipe-toggle-units {
+      color: #34c759;
+    }
+
+    /* Print Unit Counter */
+    .print-unit-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: rgba(0,0,0,0.02);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s;
+    }
+    .print-unit-box.pu-ok {
+      background: rgba(52,199,89,0.06);
+      border-color: rgba(52,199,89,0.25);
+    }
+    .print-unit-box.pu-warn {
+      background: rgba(255,59,48,0.06);
+      border-color: rgba(255,59,48,0.25);
+    }
+    .pu-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .pu-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .pu-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+    .pu-breakdown {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+    .pu-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .pu-capacity {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .pu-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .pu-status-ok {
+      background: #e8f5e2;
+      color: #1d7324;
+    }
+    .pu-status-warn {
+      background: #fce8e8;
+      color: #c62828;
+    }
+
   </style>
 </head>
 <body>
@@ -1192,31 +1373,100 @@ app.get('/', (c) => {
   <div id="new-job-overlay" class="modal-overlay">
     <div class="modal">
       <div class="modal-head">
-        <span class="modal-title" data-en="New Job" data-tr="Yeni Is">New Job</span>
-        <button class="modal-close" onclick="closeNewJobModal()">X</button>
+        <span class="modal-title" data-en="New Job" data-tr="Yeni İş">New Job</span>
+        <button class="modal-close" onclick="closeNewJobModal()">✕</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="nj-press-id" value="">
+        <input type="hidden" id="nj-max-colors" value="8">
         <div class="field">
-          <label data-en="Job Number" data-tr="Is Numarasi">Job Number</label>
+          <label data-en="Job Number" data-tr="İş Numarası">Job Number</label>
           <input type="text" id="nj-number" placeholder="e.g. JOB-2024-001">
         </div>
         <div class="field">
-          <label data-en="Product Name" data-tr="Urun Adi">Product Name</label>
+          <label data-en="Product Name" data-tr="Ürün Adı">Product Name</label>
           <input type="text" id="nj-title" placeholder="e.g. Coca-Cola Red Label">
         </div>
-        <div class="field">
-          <label data-en="Spot Colors" data-tr="Özel Renkler">Spot Colors</label>
-          <div id="nj-colors-container" style="display:flex; flex-direction:column; gap:8px;"></div>
-          <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="addJobColorEntry()" data-en="+ Add color" data-tr="+ Renk ekle">+ Add color</button>
+
+        <!-- Recipe Section -->
+        <div class="recipe-section">
+          <div class="recipe-section-title">
+            <span>🎨</span>
+            <span data-en="Recipe / Print Units" data-tr="Rezeptur / Druckwerke">Recipe / Print Units</span>
+          </div>
+          <div class="recipe-toggles">
+            <div class="recipe-toggle-row" id="nj-white-row">
+              <div class="recipe-toggle-label">
+                <span class="recipe-icon recipe-icon-white">W</span>
+                <div>
+                  <div data-en="White (Base)" data-tr="Weiß (Basis)">White (Base)</div>
+                  <div class="recipe-toggle-hint" data-en="Opaque white base layer" data-tr="Deckweiß-Grundschicht">Opaque white base layer</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="recipe-toggle-units" id="nj-white-units">+1</span>
+                <button class="toggle-pill" id="nj-white-toggle" type="button" onclick="toggleRecipe('white')"></button>
+              </div>
+            </div>
+            <div class="recipe-toggle-row" id="nj-cmyk-row">
+              <div class="recipe-toggle-label">
+                <span class="recipe-icon recipe-icon-cmyk">CMYK</span>
+                <div>
+                  <div>CMYK</div>
+                  <div class="recipe-toggle-hint" data-en="Cyan, Magenta, Yellow, Black" data-tr="Cyan, Magenta, Gelb, Schwarz">Cyan, Magenta, Yellow, Black</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="recipe-toggle-units" id="nj-cmyk-units">+4</span>
+                <button class="toggle-pill" id="nj-cmyk-toggle" type="button" onclick="toggleRecipe('cmyk')"></button>
+              </div>
+            </div>
+            <div class="recipe-toggle-row" id="nj-varnish-row">
+              <div class="recipe-toggle-label">
+                <span class="recipe-icon" style="background:#e0f7fa; color:#00796b; border:1px solid #b2ebf2;">V</span>
+                <div>
+                  <div data-en="Varnish (Lack)" data-tr="Lack (Varnish)">Varnish (Lack)</div>
+                  <div class="recipe-toggle-hint" data-en="Overprint varnish/coating" data-tr="Überdrucklack / Schutzlack">Overprint varnish/coating</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="recipe-toggle-units" id="nj-varnish-units">+1</span>
+                <button class="toggle-pill" id="nj-varnish-toggle" type="button" onclick="toggleRecipe('varnish')"></button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Spot Colors -->
         <div class="field">
-          <label data-en="Target Quantity" data-tr="Hedef Miktarı">Target Quantity</label>
+          <label data-en="Spot Colors" data-tr="Sonderfarben">Spot Colors</label>
+          <div id="nj-colors-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="addJobColorEntry()" data-en="+ Add Spot Color" data-tr="+ Sonderfarbe hinzufügen">+ Add Spot Color</button>
+        </div>
+
+        <!-- Print Unit Counter -->
+        <div class="print-unit-box" id="nj-pu-box">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">
+            <div>
+              <div class="pu-label" data-en="Total Print Units" data-tr="Toplam Baskı Üniteleri">Total Print Units</div>
+              <div class="pu-value" id="nj-pu-value">0</div>
+              <div class="pu-breakdown" id="nj-pu-breakdown">No selection</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="pu-label" data-en="Target Setup Time" data-tr="Hedef Setup Süresi">Target Setup Time</div>
+              <div class="pu-value" id="nj-setup-target" style="color:var(--accent);">-- Min</div>
+              <div class="pu-status" id="nj-pu-status" style="margin-top:4px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:16px;">
+          <label data-en="Target Quantity" data-tr="Zielmenge">Target Quantity</label>
           <input type="number" id="nj-target" placeholder="50000">
         </div>
         <div class="modal-actions">
-          <button class="btn-ghost" onclick="closeNewJobModal()" data-en="Cancel" data-tr="Iptal">Cancel</button>
-          <button class="btn-primary" onclick="submitNewJob()" data-en="Create Job" data-tr="Is Olustur">Create Job</button>
+          <button class="btn-ghost" onclick="closeNewJobModal()" data-en="Cancel" data-tr="Abbrechen">Cancel</button>
+          <button class="btn-primary" id="nj-submit-btn" onclick="submitNewJob()" data-en="Create Job" data-tr="Job erstellen">Create Job</button>
         </div>
       </div>
     </div>
@@ -1543,6 +1793,7 @@ app.get('/', (c) => {
               target_units: r.target_units,
               actual_stops: r.actual_stops,
               actual_waste: r.actual_waste,
+              setup_target_min: r.setup_target_min,
               measurements: []
             };
           }
@@ -1614,6 +1865,8 @@ app.get('/', (c) => {
     function renderDashboard(data) {
       var container = document.getElementById('dashboard');
       var presses = data.presses || [];
+      // Cache presses for New Job modal capacity validation
+      window._pressesCache = presses;
 
       if (presses.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:80px 24px;">' +
@@ -1696,12 +1949,103 @@ app.get('/', (c) => {
       if(cont) cont.innerHTML = '';
       addJobColorEntry();
       document.getElementById('nj-target').value = '';
+
+      // Reset recipe toggles
+      var whiteToggle = document.getElementById('nj-white-toggle');
+      var cmykToggle = document.getElementById('nj-cmyk-toggle');
+      var varnishToggle = document.getElementById('nj-varnish-toggle');
+      if (whiteToggle) whiteToggle.classList.remove('active');
+      if (cmykToggle) cmykToggle.classList.remove('active');
+      if (varnishToggle) varnishToggle.classList.remove('active');
+      document.getElementById('nj-white-row').classList.remove('is-active');
+      document.getElementById('nj-cmyk-row').classList.remove('is-active');
+      document.getElementById('nj-varnish-row').classList.remove('is-active');
+
+      // Get max_colors for this press from dashboard data
+      var maxColors = 8;
+      if (pressId && window._pressesCache) {
+        for (var i = 0; i < window._pressesCache.length; i++) {
+          if (window._pressesCache[i].id == pressId) {
+            maxColors = window._pressesCache[i].max_colors || 8;
+            break;
+          }
+        }
+      }
+      document.getElementById('nj-max-colors').value = maxColors;
+      document.getElementById('nj-pu-status').setAttribute('data-max', maxColors);
+      document.getElementById('nj-pu-status').setAttribute('data-press-id', pressId);
+
+      updatePrintUnitDisplay();
       document.getElementById('new-job-overlay').classList.add('open');
       setTimeout(function() { document.getElementById('nj-number').focus(); }, 80);
     }
 
     function closeNewJobModal() {
       document.getElementById('new-job-overlay').classList.remove('open');
+    }
+
+    function toggleRecipe(type) {
+      var toggle = document.getElementById('nj-' + type + '-toggle');
+      var row = document.getElementById('nj-' + type + '-row');
+      toggle.classList.toggle('active');
+      row.classList.toggle('is-active');
+      updatePrintUnitDisplay();
+    }
+
+    function calculatePrintUnits() {
+      var units = 0;
+      var parts = [];
+      var whiteOn = document.getElementById('nj-white-toggle').classList.contains('active');
+      var cmykOn = document.getElementById('nj-cmyk-toggle').classList.contains('active');
+      var varnishOn = document.getElementById('nj-varnish-toggle').classList.contains('active');
+      if (whiteOn) { units += 1; parts.push('W:1'); }
+      if (cmykOn)  { units += 4; parts.push('CMYK:4'); }
+      var spotInputs = document.querySelectorAll('#nj-colors-container .nj-color-name');
+      var spotCount = 0;
+      for (var i = 0; i < spotInputs.length; i++) {
+        if (spotInputs[i].value.trim()) spotCount++;
+      }
+      if (spotCount > 0) { units += spotCount; parts.push('Spot:' + spotCount); }
+      if (varnishOn) { units += 1; parts.push('V:1'); }
+      return { total: units, parts: parts, hasWhite: whiteOn, hasCmyk: cmykOn, hasVarnish: varnishOn, spotCount: spotCount };
+    }
+
+    function updatePrintUnitDisplay() {
+      var calc = calculatePrintUnits();
+      document.getElementById('nj-pu-value').textContent = calc.total;
+      document.getElementById('nj-pu-breakdown').textContent = calc.parts.length > 0 ? calc.parts.join(' + ') : (currentLang === 'tr' ? 'Seçim yok' : 'No selection');
+      
+      var maxColors = parseInt(document.getElementById('nj-pu-status').getAttribute('data-max') || 8);
+      var statusEl = document.getElementById('nj-pu-status');
+      
+      // Setup Time Calculation: (Prev_Units + New_Units) * 2
+      var prevUnits = 8; // Default
+      var pressId = document.getElementById('nj-pu-status').getAttribute('data-press-id');
+      if (pressId && window._pressesCache) {
+        var press = window._pressesCache.find(function(p) { return p.id == pressId; });
+        if (press && press.jobs) {
+          var jobKeys = Object.keys(press.jobs);
+          if (jobKeys.length > 0) {
+            // Get the most recent job's units
+            var lastJob = press.jobs[jobKeys[jobKeys.length - 1]];
+            prevUnits = lastJob.print_units || lastJob.color_count || 8;
+          }
+        }
+      }
+      var targetMin = (prevUnits + calc.total) * 2;
+      document.getElementById('nj-setup-target').textContent = targetMin + ' Min';
+      document.getElementById('nj-setup-target').setAttribute('data-val', targetMin);
+
+      if (calc.total > maxColors) {
+        statusEl.textContent = '⚠ ' + (currentLang === 'tr' ? 'Kapasite aşıldı' : 'Exceeds capacity');
+        statusEl.className = 'pu-status pu-status-warn';
+      } else if (calc.total > 0) {
+        statusEl.textContent = '✓ OK';
+        statusEl.className = 'pu-status pu-status-ok';
+      } else {
+        statusEl.textContent = '';
+        statusEl.className = 'pu-status';
+      }
     }
 
     async function submitNewJob() {
@@ -1715,25 +2059,49 @@ app.get('/', (c) => {
       }
       var target_units = parseInt(document.getElementById('nj-target').value) || 0;
       var press_id = parseInt(document.getElementById('nj-press-id').value) || null;
+      var calc = calculatePrintUnits();
+      var setupTargetMin = parseInt(document.getElementById('nj-setup-target').getAttribute('data-val')) || 0;
 
       if (!job_number || !job_title) {
-        showToast(currentLang === 'tr' ? 'Is numarasi ve basligi gereklidir' : 'Job number and title are required');
+        showToast(currentLang === 'tr' ? 'İş numarası ve başlığı gereklidir' : 'Job number and title are required');
         return;
+      }
+
+      // Warn if exceeding capacity (but allow override)
+      var maxColors = parseInt(document.getElementById('nj-max-colors').value) || 8;
+      if (calc.total > maxColors) {
+        if (!confirm((currentLang === 'tr'
+          ? 'Achtung: ' + calc.total + ' Druckwerke benötigt, aber Maschine hat nur ' + maxColors + '. Trotzdem erstellen?'
+          : 'Warning: ' + calc.total + ' print units required, but machine only supports ' + maxColors + '. Create anyway?'))) {
+          return;
+        }
       }
 
       try {
         var res = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_number: job_number, job_title: job_title, colors: colors_arr, color_count: colors_arr.length, press_id: press_id, target_units: target_units })
+          body: JSON.stringify({
+            job_number: job_number,
+            job_title: job_title,
+            colors: colors_arr,
+            color_count: colors_arr.length,
+            press_id: press_id,
+            target_units: target_units,
+            has_white: calc.hasWhite ? 1 : 0,
+            has_cmyk: calc.hasCmyk ? 1 : 0,
+            has_varnish: calc.hasVarnish ? 1 : 0,
+            print_units: calc.total,
+            setup_target_min: setupTargetMin
+          })
         });
         var data = await res.json();
         if (data.error) { showToast('Error: ' + data.error); return; }
         closeNewJobModal();
-        showToast(currentLang === 'tr' ? 'Is olusturuldu' : 'Job created');
+        showToast(currentLang === 'tr' ? 'Job erstellt' : 'Job created');
         loadDashboard();
       } catch (e) {
-        showToast(currentLang === 'tr' ? 'Hata olustu' : 'An error occurred');
+        showToast(currentLang === 'tr' ? 'Fehler aufgetreten' : 'An error occurred');
       }
     }
 
@@ -1741,9 +2109,9 @@ app.get('/', (c) => {
       var container = document.getElementById('nj-colors-container');
       var entry = document.createElement('div');
       entry.className = 'color-entry';
-      var colorLabel = currentLang === 'tr' ? 'Renk adi (örn. Cyan)' : 'Color name';
+      var colorLabel = currentLang === 'tr' ? 'z.B. Pantone 485 C' : 'e.g. Pantone 485 C';
       entry.innerHTML =
-        '<button class="remove-color-btn" onclick="removeJobColorEntry(this)" title="Remove">x</button>' +
+        '<button class="remove-color-btn" onclick="removeJobColorEntry(this)" title="Remove">✕</button>' +
         '<div class="color-entry-head" style="margin-bottom:0;">' +
           '<div style="flex:1;">' +
             '<input type="text" list="pantone-list" class="nj-color-name" placeholder="' + colorLabel + '" style="width:100%;font-family:var(--font);font-size:14px;color:var(--text-primary);background:rgba(0,0,0,0.03);border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;padding:8px 12px;outline:none;">' +
@@ -1757,16 +2125,21 @@ app.get('/', (c) => {
           addJobColorEntry();
         }
       });
+      nameInput.addEventListener('input', function() {
+        updatePrintUnitDisplay();
+      });
       container.appendChild(entry);
       
       if (container.children.length > 1) {
         setTimeout(function() { nameInput.focus(); }, 20);
       }
+      updatePrintUnitDisplay();
     }
 
     function removeJobColorEntry(btn) {
       var container = document.getElementById('nj-colors-container');
       btn.closest('.color-entry').remove();
+      updatePrintUnitDisplay();
     }
 
     // ── New Measurement modal (deprecated/legacy fallback) ────────────────
@@ -2613,7 +2986,6 @@ app.get('/', (c) => {
       }
     }
 
-    // ── Color Management inside Details ───────────────────────────────
     async function renameJobColor(jobId, oldColorName) {
       var newColorName = prompt(currentLang === 'tr' ? 'Yeni renk adını girin:' : 'Enter new color name:', oldColorName);
       if (!newColorName || newColorName.trim() === '' || newColorName === oldColorName) return;
@@ -2621,66 +2993,10 @@ app.get('/', (c) => {
         var res = await fetch('/api/jobs/' + jobId + '/colors/' + encodeURIComponent(oldColorName), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ new_color: newColorName.trim() })
+          body: JSON.stringify({ newName: newColorName })
         });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Renk adı güncellendi' : 'Color updated');
-          openJobDetail(jobId);
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error updating color');
-      }
-    }
-
-    async function deleteJobColor(jobId, colorName) {
-      if (!confirm(currentLang === 'tr' ? 'Bu rengi ve tüm ölçümlerini silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this color and ALL its measurements permanently?')) return;
-      try {
-        var res = await fetch('/api/jobs/' + jobId + '/colors/' + encodeURIComponent(colorName), {
-          method: 'DELETE'
-        });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Renk silindi' : 'Color deleted');
-          openJobDetail(jobId);
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error deleting color');
-      }
-    }
-
-    // ── Init ─────────────────────────────────────────────────────────────
-    async function updateJobUnits(jobId, currentUnits, currentWaste, currentStops) {
-      var newUnitsVal = prompt(currentLang === 'tr' ? 'Yeni üretim miktarı (m):' : 'Update production units (m):', currentUnits || 0);
-      if (newUnitsVal === null) return;
-      var newUnits = parseInt(newUnitsVal, 10);
-      if (isNaN(newUnits) || newUnits < 0) {
-        showToast(currentLang === 'tr' ? 'Geçersiz değer.' : 'Invalid number.');
-        return;
-      }
-      try {
-        var payload = { units: newUnits, waste: currentWaste || 0, stops: currentStops || 0 };
-        var res = await fetch('/api/jobs/' + jobId + '/performance', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        var data = await res.json();
-        if (data.ok) {
-          showToast(currentLang === 'tr' ? 'Üretim miktarı güncellendi.' : 'Production units updated.');
-          loadDashboard();
-        } else {
-          showToast('Error: ' + (data.error || 'Unknown'));
-        }
-      } catch (e) {
-        showToast('Error updating units');
-      }
+        if (res.ok) loadDashboard();
+      } catch (e) { console.error(e); }
     }
 
     applyLang(currentLang);
@@ -2688,233 +3004,15 @@ app.get('/', (c) => {
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </body>
-</html>`)
-})
+</html>
+  `);
+});
 
-// ── DB Migration (enhanced) ────────────────────────────────────────────────
+// ── API ──────────────────────────────────────────────────────────────────
+
 app.get('/api/migrate', async (c) => {
   const db = c.env.DB;
-  const log = [];
   try {
-    // 1. Create presses table
-    await db.prepare(`CREATE TABLE IF NOT EXISTS presses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      machine TEXT,
-      max_colors INTEGER DEFAULT 8,
-      status TEXT DEFAULT 'idle',
-      sort_order INTEGER DEFAULT 0
-    )`).run();
-    log.push('presses table ensured');
-
-    // 2. Seed presses if empty
-    const pressCount = await db.prepare(`SELECT COUNT(*) as cnt FROM presses`).first();
-    if (pressCount.cnt === 0) {
-      await db.batch([
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 1', 'Rotogravure 1', 8, 'idle', 1)`),
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 2', 'Rotogravure 2', 8, 'idle', 2)`),
-        db.prepare(`INSERT INTO presses (name, machine, max_colors, status, sort_order) VALUES ('Roto 3', 'Rotogravure 3', 10, 'idle', 3)`)
-      ]);
-      log.push('seeded Roto 1/2/3');
-    }
-
-    // 3. Create jobs table
-    await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_number TEXT NOT NULL UNIQUE,
-      job_title TEXT NOT NULL,
-      print_method TEXT,
-      color_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'active',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-    log.push('jobs table ensured');
-
-    // 4. Add performance columns to jobs if missing
-    const jobsInfo = await db.prepare(`PRAGMA table_info(jobs)`).all();
-    const jobsCols = (jobsInfo.results || []).map(r => r.name);
-    
-    const performanceCols = [
-      { name: 'press_id', type: 'INTEGER' },
-      { name: 'setup_start_at', type: 'TEXT' },
-      { name: 'first_pull_at', type: 'TEXT' },
-      { name: 'prod_start_at', type: 'TEXT' },
-      { name: 'prev_units', type: 'INTEGER DEFAULT 8' },
-      { name: 'curr_units', type: 'INTEGER DEFAULT 8' },
-      { name: 'target_units', type: 'INTEGER DEFAULT 0' },
-      { name: 'actual_stops', type: 'INTEGER' },
-      { name: 'actual_waste', type: 'INTEGER' }
-    ];
-
-    for (const col of performanceCols) {
-      if (!jobsCols.includes(col.name)) {
-        await db.prepare(`ALTER TABLE jobs ADD COLUMN ${col.name} ${col.type}`).run();
-        log.push(`added ${col.name} to jobs`);
-      }
-    }
-
-    // 5. Add missing columns to benchmarks
-    const tableInfo = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
-    const cols = (tableInfo.results || []).map(r => r.name);
-
-    if (!cols.includes('job_id')) {
-      await db.prepare(`ALTER TABLE benchmarks ADD COLUMN job_id INTEGER`).run();
-      log.push('added job_id column');
-    }
-    if (!cols.includes('color_hex')) {
-      await db.prepare(`ALTER TABLE benchmarks ADD COLUMN color_hex TEXT`).run();
-      log.push('added color_hex column');
-    }
-    if (!cols.includes('measurement_seq')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN measurement_seq INTEGER DEFAULT 1').run(); log.push('added measurement_seq column'); } catch(e) {}
-    }
-    if (!cols.includes('edited_at')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN edited_at TEXT').run(); log.push('added edited_at column'); } catch(e) {}
-    }
-    if (!cols.includes('edited_from')) {
-      try { await db.prepare('ALTER TABLE benchmarks ADD COLUMN edited_from TEXT').run(); log.push('added edited_from column'); } catch(e) {}
-    }
-
-    // 6. Auto-create jobs from existing product groups (only for unlinked rows)
-    const colorCol = cols.includes('color') ? 'color' : 'color_name';
-    const unlinked = await db.prepare(`SELECT DISTINCT product FROM benchmarks WHERE job_id IS NULL AND product IS NOT NULL`).all();
-    const products = unlinked.results || [];
-    log.push('found ' + products.length + ' unlinked product groups');
-
-    for (const row of products) {
-      const productName = row.product;
-      const existing = await db.prepare(`SELECT id FROM jobs WHERE job_title = ?`).bind(productName).first();
-      let jobId;
-      if (existing) {
-        jobId = existing.id;
-        log.push('reusing job #' + jobId + ' for "' + productName + '"');
-      } else {
-        const jobNum = 'AUTO-' + productName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
-        try {
-          const ins = await db.prepare(
-            `INSERT INTO jobs (job_number, job_title, print_method, color_count) VALUES (?, ?, 'Gravure', 0)`
-          ).bind(jobNum, productName).run();
-          jobId = ins.meta.last_row_id;
-          log.push('created job #' + jobId + ' "' + productName + '"');
-        } catch(e) {
-          const fallback = await db.prepare(`SELECT id FROM jobs WHERE job_number = ?`).bind(jobNum).first();
-          jobId = fallback ? fallback.id : null;
-          log.push('job_number conflict for "' + jobNum + '", reusing #' + jobId);
-        }
-      }
-
-      if (jobId) {
-        await db.prepare(`UPDATE benchmarks SET job_id = ? WHERE product = ? AND job_id IS NULL`).bind(jobId, productName).run();
-        const countResult = await db.prepare(`SELECT COUNT(DISTINCT ${colorCol}) as cnt FROM benchmarks WHERE job_id = ?`).bind(jobId).first();
-        await db.prepare(`UPDATE jobs SET color_count = ? WHERE id = ?`).bind(countResult ? countResult.cnt : 0, jobId).run();
-        log.push('linked benchmarks for "' + productName + '" to job #' + jobId);
-      }
-    }
-
-    // 7. Assign all existing jobs without press_id to Roto 1 (the first press)
-    const firstPress = await db.prepare(`SELECT id FROM presses ORDER BY sort_order ASC LIMIT 1`).first();
-    if (firstPress) {
-      await db.prepare(`UPDATE jobs SET press_id = ? WHERE press_id IS NULL`).bind(firstPress.id).run();
-      log.push('assigned unlinked jobs to press #' + firstPress.id + ' (Roto 1)');
-    }
-
-    // 8. Create performance indexes (IF NOT EXISTS is idempotent)
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_job_id ON benchmarks(job_id)`).run();
-      log.push('index: benchmarks.job_id');
-    } catch(e) { log.push('index benchmarks.job_id skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_job_created ON benchmarks(job_id, created_at)`).run();
-      log.push('index: benchmarks(job_id, created_at)');
-    } catch(e) { log.push('index benchmarks.job_created skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_benchmarks_seq ON benchmarks(measurement_seq)`).run();
-      log.push('index: benchmarks.measurement_seq');
-    } catch(e) { log.push('index benchmarks.seq skip: ' + e.message); }
-    try {
-      await db.prepare(`CREATE INDEX IF NOT EXISTS idx_jobs_press_status ON jobs(press_id, status)`).run();
-      log.push('index: jobs(press_id, status)');
-    } catch(e) { log.push('index jobs.press_status skip: ' + e.message); }
-
-    return c.json({ ok: true, log });
-  } catch(e) {
-    return c.json({ ok: false, error: e.message, log }, 500);
-  }
-});
-
-// ── Presses API ─────────────────────────────────────────────────────────────
-app.get('/api/presses', async (c) => {
-  const db = c.env.DB;
-  try {
-    const result = await db.prepare(`SELECT * FROM presses ORDER BY sort_order`).all();
-    return c.json({ presses: result.results || [] });
-  } catch(e) {
-    return c.json({ error: e.message, presses: [] }, 500);
-  }
-});
-
-app.put('/api/presses/:id', async (c) => {
-  const db = c.env.DB;
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const { status } = body;
-  try {
-    await db.prepare(`UPDATE presses SET status = ? WHERE id = ?`).bind(status, id).run();
-    return c.json({ ok: true });
-  } catch(e) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-// ── Dashboard API ───────────────────────────────────────────────────────────
-app.get('/api/dashboard', async (c) => {
-  const db = c.env.DB;
-  try {
-    // Ensure presses table exists
-    await db.prepare(`CREATE TABLE IF NOT EXISTS presses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      machine TEXT,
-      max_colors INTEGER DEFAULT 8,
-      status TEXT DEFAULT 'idle',
-      sort_order INTEGER DEFAULT 0
-    )`).run();
-
-    await db.prepare(`CREATE TABLE IF NOT EXISTS jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_number TEXT NOT NULL UNIQUE,
-      job_title TEXT NOT NULL,
-      press_id INTEGER,
-      print_method TEXT,
-      color_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'active',
-      job_state TEXT DEFAULT 'ready',
-      target_units INTEGER DEFAULT 0,
-      curr_units INTEGER DEFAULT 0,
-      actual_stops INTEGER DEFAULT 0,
-      actual_waste INTEGER DEFAULT 0,
-      setup_start_at TEXT,
-      first_pull_at TEXT,
-      production_start_at TEXT,
-      completed_at TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-
-    await db.prepare(`CREATE TABLE IF NOT EXISTS benchmarks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id INTEGER,
-      color TEXT,
-      color_hex TEXT,
-      de REAL,
-      ds REAL,
-      delta_c REAL,
-      sctv_5 REAL, sctv_10 REAL, sctv_25 REAL, sctv_50 REAL, sctv_75 REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`).run();
-
-    // Ensure all required columns exist on jobs (handles pre-existing tables with old schema)
     const jobsMeta = await db.prepare(`PRAGMA table_info(jobs)`).all();
     const jobsColNames = (jobsMeta.results || []).map(r => r.name);
     const requiredJobCols = [
@@ -2931,14 +3029,17 @@ app.get('/api/dashboard', async (c) => {
       { name: 'production_start_at', type: 'TEXT' },
       { name: 'completed_at', type: 'TEXT' },
       { name: 'prev_units', type: 'INTEGER DEFAULT 8' },
+      { name: 'has_white', type: 'INTEGER DEFAULT 0' },
+      { name: 'has_cmyk', type: 'INTEGER DEFAULT 1' },
+      { name: 'has_varnish', type: 'INTEGER DEFAULT 0' },
+      { name: 'print_units', type: 'INTEGER DEFAULT 0' },
+      { name: 'setup_target_min', type: 'INTEGER DEFAULT 0' }
     ];
     for (const col of requiredJobCols) {
       if (!jobsColNames.includes(col.name)) {
         try { await db.prepare(`ALTER TABLE jobs ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
       }
     }
-
-    // Ensure all required columns exist on benchmarks
     const bmMeta = await db.prepare(`PRAGMA table_info(benchmarks)`).all();
     const bmColNames = (bmMeta.results || []).map(r => r.name);
     const requiredBmCols = [
@@ -2949,19 +3050,34 @@ app.get('/api/dashboard', async (c) => {
       { name: 'sctv_10', type: 'REAL' },
       { name: 'sctv_25', type: 'REAL' },
       { name: 'sctv_50', type: 'REAL' },
-      { name: 'sctv_75', type: 'REAL' },
+      { name: 'sctv_75', type: 'REAL' }
     ];
     for (const col of requiredBmCols) {
       if (!bmColNames.includes(col.name)) {
         try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
       }
     }
+    return c.json({ ok: true });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
 
+app.get('/api/presses', async (c) => {
+  const db = c.env.DB;
+  const result = await db.prepare('SELECT * FROM presses ORDER BY sort_order').all();
+  return c.json({ presses: result.results || [] });
+});
+
+app.get('/api/dashboard', async (c) => {
+  const db = c.env.DB;
+  try {
     const result = await db.prepare(`
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
         j.id as job_id, j.job_number, j.job_title, j.print_method, j.color_count, j.status as job_status,
         j.setup_start_at, j.first_pull_at, j.prod_start_at, j.prev_units, j.curr_units, j.actual_stops, j.actual_waste, j.target_units,
+        j.setup_target_min,
         b.id as benchmark_id, b.color as color_name, b.color_hex, b.de, b.ds, b.delta_c, b.created_at as measured_at,
         b.sctv_5, b.sctv_10, b.sctv_25, b.sctv_50, b.sctv_75
       FROM presses p
@@ -2974,8 +3090,6 @@ app.get('/api/dashboard', async (c) => {
     `).all();
 
     var rows = result.results || [];
-
-    // Group into nested structure
     var pressMap = {};
     var pressOrder = [];
     for (var i = 0; i < rows.length; i++) {
@@ -2983,49 +3097,25 @@ app.get('/api/dashboard', async (c) => {
       var pid = r.press_id;
       if (!pressMap[pid]) {
         pressMap[pid] = {
-          id: pid,
-          name: r.press_name,
-          machine: r.press_machine,
-          max_colors: r.max_colors,
-          status: r.press_status,
-          sort_order: r.sort_order,
-          _jobs: {}
+          id: pid, name: r.press_name, machine: r.press_machine, max_colors: r.max_colors,
+          status: r.press_status, sort_order: r.sort_order, _jobs: {}
         };
         pressOrder.push(pid);
       }
       if (r.job_id) {
         if (!pressMap[pid]._jobs[r.job_id]) {
           pressMap[pid]._jobs[r.job_id] = {
-            id: r.job_id,
-            job_number: r.job_number,
-            job_title: r.job_title,
-            print_method: r.print_method,
-            color_count: r.color_count,
-            status: r.job_status,
-            setup_start_at: r.setup_start_at,
-            first_pull_at: r.first_pull_at,
-            prod_start_at: r.prod_start_at,
-            curr_units: r.curr_units,
-            target_units: r.target_units,
-            actual_stops: r.actual_stops,
-            actual_waste: r.actual_waste,
-            measurements: []
+            id: r.job_id, job_number: r.job_number, job_title: r.job_title,
+            print_method: r.print_method, color_count: r.color_count, status: r.job_status,
+            setup_start_at: r.setup_start_at, first_pull_at: r.first_pull_at, prod_start_at: r.prod_start_at,
+            curr_units: r.curr_units, target_units: r.target_units, actual_stops: r.actual_stops,
+            actual_waste: r.actual_waste, setup_target_min: r.setup_target_min, measurements: []
           };
         }
         if (r.color_name) {
           pressMap[pid]._jobs[r.job_id].measurements.push({
-            id: r.benchmark_id,
-            color_name: r.color_name,
-            color_hex: r.color_hex,
-            de: r.de,
-            ds: r.ds,
-            delta_c: r.delta_c,
-            measured_at: r.measured_at,
-            sctv_5: r.sctv_5,
-            sctv_10: r.sctv_10,
-            sctv_25: r.sctv_25,
-            sctv_50: r.sctv_50,
-            sctv_75: r.sctv_75
+            id: r.benchmark_id, color_name: r.color_name, color_hex: r.color_hex, de: r.de, ds: r.ds, delta_c: r.delta_c,
+            measured_at: r.measured_at, sctv_5: r.sctv_5, sctv_10: r.sctv_10, sctv_25: r.sctv_25, sctv_50: r.sctv_50, sctv_75: r.sctv_75
           });
         }
       }
@@ -3038,34 +3128,19 @@ app.get('/api/dashboard', async (c) => {
       var jobKeys = Object.keys(press._jobs);
       for (var j = 0; j < jobKeys.length; j++) {
         var job = press._jobs[jobKeys[j]];
-        
-        // Ensure CMYK fix rows for the active job
         var cmykNames = ['Cyan', 'Magenta', 'Yellow', 'Black'];
         var cmykHex = { 'Cyan': '#00a3e0', 'Magenta': '#e9008c', 'Yellow': '#ffed00', 'Black': '#000000' };
         var finalMeasurements = [];
-        
         cmykNames.forEach(function(name) {
           var found = job.measurements.find(function(m) { return m.color_name === name; });
-          if (found) {
-            finalMeasurements.push(found);
-          } else {
-            finalMeasurements.push({ color_name: name, color_hex: cmykHex[name], de: null, ds: null, delta_c: null });
-          }
+          if (found) finalMeasurements.push(found);
+          else finalMeasurements.push({ color_name: name, color_hex: cmykHex[name], de: null, ds: null, delta_c: null });
         });
-        
-        // Add other spot colors
-        job.measurements.forEach(function(m) {
-          if (!cmykNames.includes(m.color_name)) {
-            finalMeasurements.push(m);
-          }
-        });
-        
+        job.measurements.forEach(function(m) { if (!cmykNames.includes(m.color_name)) finalMeasurements.push(m); });
         job.measurements = finalMeasurements;
         jobsArr.push(job);
       }
-      // Sort by descending ID to ensure the newest job is first
       jobsArr.sort(function(a, b) { return b.id - a.id; });
-      // Only keep the current (most recent) job per press
       jobsArr = jobsArr.slice(0, 1);
       presses.push({
         id: press.id,
@@ -3268,8 +3343,25 @@ app.post('/api/jobs', async (c) => {
     try { await db.prepare(`ALTER TABLE jobs ADD COLUMN completed_at TEXT`).run(); } catch(e) {}
   }
 
+  // Ensure recipe columns exist
+  if (!jobsCols.includes('has_white')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN has_white INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('has_cmyk')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN has_cmyk INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('print_units')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN print_units INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('has_varnish')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN has_varnish INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+  if (!jobsCols.includes('setup_target_min')) {
+    try { await db.prepare(`ALTER TABLE jobs ADD COLUMN setup_target_min INTEGER DEFAULT 0`).run(); } catch(e) {}
+  }
+
   const body = await c.req.json();
-  const { job_number, job_title, print_method, color_count, press_id, target_units, colors } = body;
+  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
   try {
@@ -3279,8 +3371,8 @@ app.post('/api/jobs', async (c) => {
     }
 
     const result = await db.prepare(
-      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready').run();
+      `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, setup_target_min || 0).run();
 
     const newJobId = result.meta.last_row_id;
 
