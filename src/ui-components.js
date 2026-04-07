@@ -115,13 +115,26 @@ export const renderJobCard = `
       var wastePct = unitsActual > 0 ? (wasteTotal / unitsActual * 100).toFixed(1) : '0.0';
 
       // ── Benchmark Targets ─────────────────────────────────────────────────
-      var mechTargetMin = (job.prev_units || 0) * 1 + (job.color_count || 0) * 2;
+      var prevUnits = job.prev_units || 0;
+      var newUnits = job.print_units || job.color_count || 0;
+      var prevMin = prevUnits * 1;
+      var newMin = newUnits * 2;
+      var calculatedTarget = prevMin + newMin;
+      var mechTargetMin = job.setup_target_min > 0 ? job.setup_target_min : calculatedTarget;
 
       var tsToDate = function(ts) {
         if (!ts) return null;
         return new Date(ts.endsWith('Z') ? ts : ts + 'Z');
       };
       var msToMin = function(ms) { return ms / 60000; };
+      
+      var isTR = currentLang === 'tr';
+
+      var splitTargetInfo = '<div style="font-size:10px; color:var(--text-tertiary); margin-top:8px; padding:6px 10px; background:rgba(0,0,0,0.02); border-radius:4px; display:inline-flex; gap:12px; align-items:center;">' +
+        '<span title="' + (isTR ? 'Önceki İş' : 'Vorheriger Job') + '"><strong>' + (isTR ? 'Out:' : 'Out:') + '</strong> ' + prevUnits + ' Unit (' + prevMin + 'min)</span>' +
+        '<span title="' + (isTR ? 'Yeni İş' : 'Neuer Job') + '"><strong>' + (isTR ? 'In:' : 'In:') + '</strong> ' + newUnits + ' Unit (' + newMin + 'min)</span>' +
+        '<span style="color:var(--accent); font-weight:600;">' + (isTR ? 'Hedef:' : 'Goal:') + ' ' + mechTargetMin + ' Min</span>' +
+        '</div>';
 
       // ── Action Buttons & Timer Setup ──────────────────────────────────────
       var actionBtnHtml = '';
@@ -139,10 +152,11 @@ export const renderJobCard = `
 
       if (status === 'ready') {
         actionBtnHtml = '<button class="btn-action-main" onclick="handleJobAction(' + job.id + ', \\'start-setup\\')">▶ ' + (isTR ? 'Setup Başlat' : 'Start Setup') + '</button>';
+        targetInfo = splitTargetInfo;
       } else if (status === 'setup') {
         startTime = job.setup_start_at;
         timerPrefix = 'Setup: ';
-        targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Ziel: ' + mechTargetMin + ' Min</span>';
+        targetInfo = splitTargetInfo;
         actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
       } else if (status === 'andruck') {
         startTime = job.first_pull_at;
@@ -201,13 +215,15 @@ export const renderJobCard = `
       var timerHtml = '';
       if (startTime) {
         var targetMinVal = null;
-        if (status === 'setup' && job.setup_target_min) targetMinVal = job.setup_target_min;
+        if (status === 'setup' && mechTargetMin) targetMinVal = mechTargetMin;
         else if (status === 'andruck') targetMinVal = 10;
         
         var targetAttr = targetMinVal ? ' data-target-min="' + targetMinVal + '"' : '';
-        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '"' + targetAttr + '>00:00:00</span>' + targetInfo;
+        timerHtml = '<span class="live-timer pulsing" data-start="' + startTime + '"' + targetAttr + '>00:00:00</span>';
+        if (targetInfo) timerHtml += '<div>' + targetInfo + '</div>';
       } else if (status === 'ready') {
-        timerHtml = '<span style="color:var(--text-secondary);">' + (isTR ? 'Hazırlık Hedefi: ' : 'Setup Goal: ') + mechTargetMin + ' Min</span>';
+        timerHtml = '<span style="color:var(--text-secondary); font-size:13px;">' + (isTR ? 'Hazırlık Bekleniyor' : 'Awaiting Setup') + '</span>';
+        if (targetInfo) timerHtml += '<div>' + targetInfo + '</div>';
       } else {
         timerHtml = '-';
       }

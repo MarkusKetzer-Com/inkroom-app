@@ -3155,7 +3155,7 @@ app.get('/api/dashboard', async (c) => {
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
         j.id as job_id, j.job_number, j.job_title, j.print_method, j.color_count, j.status as job_status,
-        j.setup_start_at, j.first_pull_at, j.prod_start_at, j.prev_units, j.curr_units, j.actual_stops, j.actual_waste, j.target_units,
+        j.setup_start_at, j.first_pull_at, j.prod_start_at, j.prev_units, j.curr_units, j.print_units, j.actual_stops, j.actual_waste, j.target_units,
         j.setup_target_min,
         b.id as benchmark_id, b.color as color_name, b.color_hex, b.de, b.ds, b.delta_c, b.created_at as measured_at,
         b.sctv_5, b.sctv_10, b.sctv_25, b.sctv_50, b.sctv_75
