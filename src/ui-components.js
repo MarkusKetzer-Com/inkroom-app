@@ -144,7 +144,6 @@ export const renderJobCard = `
         timerPrefix = 'Setup: ';
         targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Ziel: ' + mechTargetMin + ' Min</span>';
         actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
-        actionBtnHtml += '<button class="btn-ghost" style="margin-top:8px; width:100%; border:1px solid var(--border-subtle);" onclick="resetMachineStatus(' + job.id + ')">' + (isTR ? 'Maschine war leer' : 'Maschine war leer') + '</button>';
       } else if (status === 'andruck') {
         startTime = job.first_pull_at;
         timerPrefix = 'Andruck: ';

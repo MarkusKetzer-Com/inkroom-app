@@ -1460,6 +1460,28 @@ app.get('/', (c) => {
           </div>
         </div>
 
+        <!-- Machine Status (Previous Job) -->
+        <div class="recipe-section" id="nj-machine-status" style="margin-top:12px;">
+          <div class="recipe-section-title">
+            <span>🔧</span>
+            <span data-en="Machine Status" data-tr="Maschinenstatus">Machine Status</span>
+          </div>
+          <div class="recipe-toggle-row" id="nj-empty-row">
+            <div class="recipe-toggle-label">
+              <span class="recipe-icon" style="background:#e3f2fd; color:#1565c0; border:1px solid #bbdefb;">M</span>
+              <div>
+                <div id="nj-prev-job-info" data-en="Loading..." data-tr="Yükleniyor...">Loading...</div>
+                <div class="recipe-toggle-hint" id="nj-prev-job-hint" data-en="Previous job on this press" data-tr="Bu makinedeki önceki iş">Previous job on this press</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="recipe-toggle-units" id="nj-prev-units-display">0</span>
+              <button class="toggle-pill" id="nj-empty-toggle" type="button" onclick="toggleMachineEmpty()"></button>
+            </div>
+          </div>
+          <div style="font-size:11px; padding:8px 12px 0; color:var(--text-tertiary);" id="nj-empty-label" data-en="Toggle ON = Machine was empty (prev units → 0)" data-tr="Açık = Makine boştu (önceki birimler → 0)">Toggle ON = Machine was empty (prev units → 0)</div>
+        </div>
+
         <div class="field" style="margin-top:16px;">
           <label data-en="Target Quantity" data-tr="Zielmenge">Target Quantity</label>
           <input type="number" id="nj-target" placeholder="50000">
@@ -1975,6 +1997,14 @@ app.get('/', (c) => {
       document.getElementById('nj-pu-status').setAttribute('data-max', maxColors);
       document.getElementById('nj-pu-status').setAttribute('data-press-id', pressId);
 
+      // Reset empty-machine toggle
+      var emptyToggle = document.getElementById('nj-empty-toggle');
+      if (emptyToggle) emptyToggle.classList.remove('active');
+      document.getElementById('nj-empty-row').classList.remove('is-active');
+
+      // Fetch previous job info for this press
+      fetchPrevJobInfo(pressId);
+
       updatePrintUnitDisplay();
       document.getElementById('new-job-overlay').classList.add('open');
       setTimeout(function() { document.getElementById('nj-number').focus(); }, 80);
@@ -2018,21 +2048,11 @@ app.get('/', (c) => {
       var maxColors = parseInt(document.getElementById('nj-pu-status').getAttribute('data-max') || 8);
       var statusEl = document.getElementById('nj-pu-status');
       
-      // Setup Time Calculation: (Prev_Units + New_Units) * 2
-      var prevUnits = 8; // Default
-      var pressId = document.getElementById('nj-pu-status').getAttribute('data-press-id');
-      if (pressId && window._pressesCache) {
-        var press = window._pressesCache.find(function(p) { return p.id == pressId; });
-        if (press && press.jobs) {
-          var jobKeys = Object.keys(press.jobs);
-          if (jobKeys.length > 0) {
-            // Get the most recent job's units
-            var lastJob = press.jobs[jobKeys[jobKeys.length - 1]];
-            prevUnits = lastJob.print_units || lastJob.color_count || 8;
-          }
-        }
-      }
-      var targetMin = (prevUnits + calc.total) * 2;
+      // Setup Time Calculation: (Prev_Units * 1) + (New_Units * 2)
+      var prevUnits = window._njPrevUnits || 0;
+      var isEmptyMachine = document.getElementById('nj-empty-toggle') && document.getElementById('nj-empty-toggle').classList.contains('active');
+      var effectivePrev = isEmptyMachine ? 0 : prevUnits;
+      var targetMin = (effectivePrev * 1) + (calc.total * 2);
       document.getElementById('nj-setup-target').textContent = targetMin + ' Min';
       document.getElementById('nj-setup-target').setAttribute('data-val', targetMin);
 
@@ -2046,6 +2066,51 @@ app.get('/', (c) => {
         statusEl.textContent = '';
         statusEl.className = 'pu-status';
       }
+    }
+
+    function toggleMachineEmpty() {
+      var toggle = document.getElementById('nj-empty-toggle');
+      var row = document.getElementById('nj-empty-row');
+      toggle.classList.toggle('active');
+      row.classList.toggle('is-active');
+      updatePrintUnitDisplay();
+    }
+
+    async function fetchPrevJobInfo(pressId) {
+      window._njPrevUnits = 0;
+      var infoEl = document.getElementById('nj-prev-job-info');
+      var hintEl = document.getElementById('nj-prev-job-hint');
+      var unitsEl = document.getElementById('nj-prev-units-display');
+      if (!pressId) {
+        infoEl.textContent = currentLang === 'tr' ? 'Makine seçilmedi' : 'No press selected';
+        hintEl.textContent = '';
+        unitsEl.textContent = '0';
+        return;
+      }
+      infoEl.textContent = currentLang === 'tr' ? 'Yükleniyor...' : 'Loading...';
+      try {
+        // Use dashboard cache to find previous job
+        if (window._pressesCache) {
+          var press = window._pressesCache.find(function(p) { return p.id == pressId; });
+          if (press && press.jobs && press.jobs.length > 0) {
+            var lastJob = press.jobs[press.jobs.length - 1];
+            var prevCount = lastJob.print_units || lastJob.color_count || 0;
+            window._njPrevUnits = prevCount;
+            infoEl.textContent = lastJob.job_title || lastJob.job_number || 'Job #' + lastJob.id;
+            hintEl.textContent = prevCount + ' ' + (currentLang === 'tr' ? 'Druckwerke' : 'print units');
+            unitsEl.textContent = prevCount;
+            updatePrintUnitDisplay();
+            return;
+          }
+        }
+        infoEl.textContent = currentLang === 'tr' ? 'Makine boş (ilk iş)' : 'Machine empty (first job)';
+        hintEl.textContent = '';
+        unitsEl.textContent = '0';
+      } catch(e) {
+        infoEl.textContent = 'N/A';
+        unitsEl.textContent = '0';
+      }
+      updatePrintUnitDisplay();
     }
 
     async function submitNewJob() {
