@@ -136,64 +136,6 @@ export const renderJobCard = `
         </div>
       </div>\`;
     }
-               </div>
-               <div class="job-title" style="margin-bottom:0; font-size:16px;">\${escapeHtml(job.job_title || '')}</div>
-            </div>
-            <div style="width:36px; height:36px; border-radius:50%; background:conic-gradient(var(--accent) \${prodPct}%, rgba(0,0,0,0.06) 0); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-               <div style="width:30px; height:30px; background:var(--surface); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600;">\${prodPct}%</div>
-            </div>
-          </div>
-          <div class="badges">\${deBadgeHtml}\${colorCountBadge}\${recipeBadgeHtml}\${mechBadgeHtml}\${adminBadgeHtml}\${prodBadgeHtml}</div>
-        </div>
-        <div class="cockpit-section">
-          <!-- Row 1: Production Units & Progress -->
-          <div style="margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-               <span class="cockpit-label" style="font-weight:600; font-size:11px; letter-spacing:0.04em; display:flex; align-items:center;">
-                 UNITS
-                 <a onclick="updateJobUnits(\${job.id}, \${unitsActual}, \${wasteTotal}, \${stopsTotal})" style="cursor:pointer; margin-left:6px; opacity:0.6; font-size:12px;" title="\${isTR ? 'Birimleri Düzenle' : 'Edit Units'}">✏️</a>
-               </span>
-               <span style="font-size:11px; color:var(--text-secondary); font-weight:500;">Current \${formatK(unitsActual)} / Target \${formatK(unitsTarget)}</span>
-            </div>
-            <div class="cockpit-progress-bar" style="margin-bottom:0;"><div class="cockpit-progress-fill" style="width:\${prodPct}%"></div></div>
-          </div>
-
-          <!-- Row 2: Duration, Waste, Stops -->
-          <div style="display:flex; gap:16px; align-items:center;">
-            <!-- Duration -->
-            <div style="flex:1;">
-               <span class="cockpit-label" style="font-weight:600; font-size:10px; letter-spacing:0.04em; margin-bottom:4px; display:block; color:var(--text-secondary);">DURATION</span>
-               <span style="font-size:13px; font-weight:600; color:var(--text-primary); font-variant-numeric:tabular-nums;">\${timerPrefix}\${timerHtml}</span>
-            </div>
-
-            <!-- Waste Circular Meter -->
-            <div style="display:flex; align-items:center; gap:8px;">
-               <span class="cockpit-label" style="font-weight:600; font-size:10px; letter-spacing:0.04em; color:var(--text-secondary);">WASTE</span>
-               <div class="meter-circle" style="--val:\${Math.min(100, wastePct)}; --meter-color:#1a7326;">
-                 <div class="meter-inner">\${wastePct}%</div>
-               </div>
-            </div>
-
-            <!-- Stops Sign -->
-            <div style="display:flex; align-items:center; gap:8px; margin-left:4px;">
-               <span class="cockpit-label" style="font-weight:600; font-size:10px; letter-spacing:0.04em; color:var(--text-secondary);">STOPS</span>
-               <div class="stop-icon">
-                 <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff" stroke="#d84315" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-                 </svg>
-                 <span class="stop-val">\${stopsTotal}</span>
-               </div>
-            </div>
-          </div>
-        </div>
-        \${tableHtml}
-        \${isZeroPull ? '<div class="zero-pull-banner">Zero Pull</div>' : ''}
-        <div class="action-btn-wrap">\${actionBtnHtml}</div>
-        <div class="card-foot">
-          <a onclick="openJobDetail(\${job.id})">\${isTR ? 'Detaylar' : 'Details'}</a>
-        </div>
-      </div>\`;
-    }
 `;
 
 /** HTML für das Metrics-Eingabe-Modal */
