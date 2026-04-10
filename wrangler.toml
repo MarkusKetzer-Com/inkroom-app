@@ -1,36 +1,8 @@
-name = "inkroom-app"
+name = "inkroom-app"  # Dies ist dein Hauptprojekt
 main = "src/index.js"
 compatibility_date = "2024-03-11"
 
 [[d1_databases]]
-binding = "DB"
-database_name = "inkroom-db"
-database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
-
-[env.preview]
-name = "preview-inkroom-app"
-[[env.preview.d1_databases]]
-binding = "DB"
-database_name = "inkroom-db"
-database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
-
-[env.preview2]
-name = "preview2-inkroom-app"
-[[env.preview2.d1_databases]]
-binding = "DB"
-database_name = "inkroom-db"
-database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
-
-[env.preview3]
-name = "preview3-inkroom-app"
-[[env.preview3.d1_databases]]
-binding = "DB"
-database_name = "inkroom-db"
-database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
-
-[env.preview4]
-name = "preview4-inkroom-app"
-[[env.preview4.d1_databases]]
 binding = "DB"
 database_name = "inkroom-db"
 database_id = "8465406c-ca21-4fda-8ede-1fe34e95adbb"
