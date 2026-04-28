@@ -2103,7 +2103,8 @@ app.get('/', (c) => {
       if (!job) return;
       
       // Update local state instantly for UI responsiveness
-      job.prev_units = Math.max(0, (job.prev_units || 0) + delta);
+      var maxUnits = job.max_units || 8;
+      job.prev_units = Math.max(0, Math.min(maxUnits, (job.prev_units || 0) + delta));
       // Recalculate target: (Out*1) + (In*2)
       var inUnits = job.print_units || job.color_count || 0;
       job.setup_target_min = (job.prev_units * 1) + (inUnits * 2);
@@ -3761,6 +3762,7 @@ app.get('/api/dashboard', async (c) => {
             target_units: r.target_units, actual_stops: r.actual_stops,
             actual_waste: r.actual_waste, setup_target_min: r.setup_target_min,
             turningbar_used: r.turningbar_used || 0, turningbar_config: r.turningbar_config || null,
+            max_units: r.max_units || 8,
             measurements: []
           };
         }
