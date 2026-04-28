@@ -15,6 +15,8 @@ CREATE TABLE jobs (
   first_pull_at TEXT,
   production_start_at TEXT,
   completed_at TEXT,
+  turningbar_used INTEGER DEFAULT 0,
+  turningbar_config TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -55,7 +57,10 @@ CREATE TABLE presses (
   machine_model TEXT,
   splice_waste_m INTEGER DEFAULT 250,
   target_speed_m_min INTEGER DEFAULT 300,
-  max_waste_percent INTEGER DEFAULT 3
+  max_waste_percent INTEGER DEFAULT 3,
+  max_units INTEGER DEFAULT 8,
+  turning_bar_options TEXT DEFAULT '[]',
+  turning_bar_extra_min INTEGER DEFAULT 20
 );
 
 CREATE TABLE system_settings (

@@ -1382,6 +1382,7 @@ app.get('/', (c) => {
         <div class="nav-tabs">
           <button id="nav-dashboard" class="nav-tab active" data-en="Dashboard" data-tr="Kontrol Paneli" onclick="switchView('dashboard')">Dashboard</button>
           <button id="nav-analytics" class="nav-tab" data-en="Analytics" data-tr="Analitik" onclick="switchView('analytics')">Analytics</button>
+          <button id="nav-settings" class="nav-tab" data-en="Settings" data-tr="Ayarlar" onclick="switchView('settings')">Settings</button>
         </div>
         <div class="lang-switcher">
           <button id="lang-en-btn" class="lang-btn active">EN</button>
@@ -1398,6 +1399,9 @@ app.get('/', (c) => {
     </div>
     <div id="analytics-view" class="hidden">
       <div id="analytics"></div>
+    </div>
+    <div id="settings-view" class="hidden">
+      <div id="settings"></div>
     </div>
   </main>
 
@@ -1497,6 +1501,30 @@ app.get('/', (c) => {
           <label data-en="Spot Colors" data-tr="Sonderfarben">Spot Colors</label>
           <div id="nj-colors-container" style="display:flex; flex-direction:column; gap:8px;"></div>
           <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="addJobColorEntry()" data-en="+ Add Spot Color" data-tr="+ Sonderfarbe hinzufügen">+ Add Spot Color</button>
+        </div>
+
+        <!-- Turning Bar -->
+        <div class="recipe-section" id="nj-turningbar-section" style="display:none;">
+          <div class="recipe-section-title">
+            <span>↔</span>
+            <span data-en="Turning Bar" data-tr="Turning Bar">Turning Bar</span>
+          </div>
+          <div class="recipe-toggles">
+            <div class="recipe-toggle-row" id="nj-tb-row">
+              <div class="recipe-toggle-label">
+                <span class="recipe-icon" style="background:#fff3e0; color:#e65100; border:1px solid #ffe0b2; font-size:14px;">↔</span>
+                <div>
+                  <div data-en="Use Turning Bar" data-tr="Turning Bar Kullan">Use Turning Bar</div>
+                  <div class="recipe-toggle-hint" id="nj-tb-hint" data-en="Extends mechanical setup by 20 min" data-tr="Mekanik kurulumu 20 dk uzatır">Extends mechanical setup by 20 min</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <select id="nj-tb-config" style="display:none;font-size:13px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--border);">
+                </select>
+                <button class="toggle-pill" id="nj-tb-toggle" type="button" onclick="toggleTurningBar()"></button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Print Unit Counter -->
@@ -2185,13 +2213,18 @@ app.get('/', (c) => {
       document.getElementById('nj-pu-value').textContent = calc.total;
       document.getElementById('nj-pu-breakdown').textContent = calc.parts.length > 0 ? calc.parts.join(' + ') : (currentLang === 'tr' ? 'Seçim yok' : 'No selection');
       
-      var maxColors = parseInt(document.getElementById('nj-pu-status').getAttribute('data-max') || 8);
+      var maxColors = parseInt((document.getElementById('nj-max-colors') || {}).value || 8);
       var statusEl = document.getElementById('nj-pu-status');
       
-      // Setup Time Calculation: (Prev_Units * 1) + (New_Units * 2)
+      // Setup Time Calculation: (Prev_Units * 1) + (New_Units * 2) + optional turningbar extra
       var prevUnits = window._njPrevUnits || 0;
-      var targetMin = (prevUnits * 1) + (calc.total * 2);
-      document.getElementById('nj-setup-target').textContent = targetMin + ' Min';
+      var tbExtra = 0;
+      var tbToggle = document.getElementById('nj-tb-toggle');
+      if (tbToggle && tbToggle.classList.contains('active')) {
+        tbExtra = window._njTbExtraMin || 20;
+      }
+      var targetMin = (prevUnits * 1) + (calc.total * 2) + tbExtra;
+      document.getElementById('nj-setup-target').textContent = targetMin + ' Min' + (tbExtra > 0 ? ' (+' + tbExtra + ' TB)' : '');
       document.getElementById('nj-setup-target').setAttribute('data-val', targetMin);
 
       if (calc.total > maxColors) {
@@ -2206,6 +2239,15 @@ app.get('/', (c) => {
       }
     }
 
+    function toggleTurningBar() {
+      var toggle = document.getElementById('nj-tb-toggle');
+      var configSel = document.getElementById('nj-tb-config');
+      toggle.classList.toggle('active');
+      var isOn = toggle.classList.contains('active');
+      if (configSel) configSel.style.display = isOn ? 'block' : 'none';
+      updatePrintUnitDisplay();
+    }
+
     function adjustPrevUnits(delta) {
       window._njPrevUnits = Math.max(0, (window._njPrevUnits || 0) + delta);
       document.getElementById('nj-prev-units-display').textContent = window._njPrevUnits;
@@ -2214,29 +2256,68 @@ app.get('/', (c) => {
 
     async function fetchPrevJobInfo(pressId) {
       window._njPrevUnits = 0;
+      window._njTbExtraMin = 20;
       var infoEl = document.getElementById('nj-prev-job-info');
       var hintEl = document.getElementById('nj-prev-job-hint');
       var unitsEl = document.getElementById('nj-prev-units-display');
+      var tbSection = document.getElementById('nj-turningbar-section');
+
+      // Reset turningbar toggle
+      var tbToggle = document.getElementById('nj-tb-toggle');
+      if (tbToggle) { tbToggle.classList.remove('active'); }
+      var tbConfigSel = document.getElementById('nj-tb-config');
+      if (tbConfigSel) { tbConfigSel.style.display = 'none'; tbConfigSel.innerHTML = ''; }
+
       if (!pressId) {
         infoEl.textContent = currentLang === 'tr' ? 'Makine seçilmedi' : 'No press selected';
         hintEl.textContent = '';
         unitsEl.textContent = '0';
+        if (tbSection) tbSection.style.display = 'none';
         return;
       }
       infoEl.textContent = currentLang === 'tr' ? 'Yükleniyor...' : 'Loading...';
       try {
-        // Use dashboard cache to find previous job
+        // Use dashboard cache to find previous job and press config
         if (window._pressesCache) {
           var press = window._pressesCache.find(function(p) { return p.id == pressId; });
-          if (press && press.jobs && press.jobs.length > 0) {
-            var lastJob = press.jobs[press.jobs.length - 1];
-            var prevCount = lastJob.print_units || lastJob.color_count || 0;
-            window._njPrevUnits = prevCount;
-            infoEl.textContent = lastJob.job_title || lastJob.job_number || 'Job #' + lastJob.id;
-            hintEl.textContent = prevCount + ' ' + (currentLang === 'tr' ? 'Druckwerke' : 'print units');
-            unitsEl.textContent = prevCount;
-            updatePrintUnitDisplay();
-            return;
+          if (press) {
+            // Update max units
+            var maxUnitsEl = document.getElementById('nj-max-colors');
+            if (maxUnitsEl) maxUnitsEl.value = press.max_units || 8;
+
+            // Turningbar section
+            var tbOptions = press.turning_bar_options;
+            if (typeof tbOptions === 'string') { try { tbOptions = JSON.parse(tbOptions); } catch(e) { tbOptions = []; } }
+            tbOptions = tbOptions || [];
+            window._njTbExtraMin = press.turning_bar_extra_min || 20;
+
+            if (tbSection) {
+              if (tbOptions.length > 0) {
+                tbSection.style.display = 'block';
+                // Update hint text
+                var hint = document.getElementById('nj-tb-hint');
+                if (hint) {
+                  hint.textContent = (currentLang === 'tr' ? 'Mekanik kurulumu +' : 'Extended setup +') + window._njTbExtraMin + ' min';
+                }
+                // Populate config dropdown
+                if (tbConfigSel) {
+                  tbConfigSel.innerHTML = tbOptions.map(function(o) { return '<option value="' + escapeHtml(o) + '">' + escapeHtml(o) + '</option>'; }).join('');
+                }
+              } else {
+                tbSection.style.display = 'none';
+              }
+            }
+
+            if (press.jobs && press.jobs.length > 0) {
+              var lastJob = press.jobs[press.jobs.length - 1];
+              var prevCount = lastJob.print_units || lastJob.color_count || 0;
+              window._njPrevUnits = prevCount;
+              infoEl.textContent = lastJob.job_title || lastJob.job_number || 'Job #' + lastJob.id;
+              hintEl.textContent = prevCount + ' ' + (currentLang === 'tr' ? 'Druckwerke' : 'print units');
+              unitsEl.textContent = prevCount;
+              updatePrintUnitDisplay();
+              return;
+            }
           }
         }
         infoEl.textContent = currentLang === 'tr' ? 'Kullanımdaki Üniteler' : 'Units in use';
@@ -2278,6 +2359,12 @@ app.get('/', (c) => {
         }
       }
 
+      // Turningbar state
+      var tbToggle2 = document.getElementById('nj-tb-toggle');
+      var tbUsed = tbToggle2 && tbToggle2.classList.contains('active') ? 1 : 0;
+      var tbConfigSel2 = document.getElementById('nj-tb-config');
+      var tbConfig = tbUsed && tbConfigSel2 ? (tbConfigSel2.value || null) : null;
+
       try {
         var res = await fetch('/api/jobs', {
           method: 'POST',
@@ -2294,7 +2381,9 @@ app.get('/', (c) => {
             has_varnish: calc.hasVarnish ? 1 : 0,
             print_units: calc.total,
             setup_target_min: setupTargetMin,
-            prev_units: window._njPrevUnits || 0
+            prev_units: window._njPrevUnits || 0,
+            turningbar_used: tbUsed,
+            turningbar_config: tbConfig
           })
         });
         var data = await res.json();
@@ -2840,12 +2929,244 @@ app.get('/', (c) => {
       currentView = view;
       document.getElementById('dashboard-view').classList.toggle('hidden', view !== 'dashboard');
       document.getElementById('analytics-view').classList.toggle('hidden', view !== 'analytics');
+      document.getElementById('settings-view').classList.toggle('hidden', view !== 'settings');
       document.getElementById('nav-dashboard').classList.toggle('active', view === 'dashboard');
       document.getElementById('nav-analytics').classList.toggle('active', view === 'analytics');
+      document.getElementById('nav-settings').classList.toggle('active', view === 'settings');
       if (view === 'analytics') loadAnalytics();
+      if (view === 'settings') loadSettings();
     }
 
-    // ── Analytics ────────────────────────────────────────────────────────
+    // ── Settings Page ─────────────────────────────────────────────────────
+    var _settingsPresses = [];
+
+    async function loadSettings() {
+      document.getElementById('settings').innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-secondary);">Loading...</div>';
+      try {
+        var res = await fetch('/api/presses');
+        var data = await res.json();
+        _settingsPresses = data.presses || [];
+        renderSettings(_settingsPresses);
+      } catch(e) {
+        document.getElementById('settings').innerHTML = '<div style="padding:40px;color:var(--text-secondary);">Error loading settings: ' + e.message + '</div>';
+      }
+    }
+
+    function renderSettings(presses) {
+      var isTR = currentLang === 'tr';
+      var html = '<div style="max-width:800px;margin:0 auto;padding:24px 16px;">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">';
+      html += '<div>';
+      html += '<h1 style="font-size:22px;font-weight:700;letter-spacing:-0.03em;margin:0;">' + (isTR ? '⚙️ Makine Yönetimi' : '⚙️ Press Configurator') + '</h1>';
+      html += '<p style="font-size:13px;color:var(--text-secondary);margin:4px 0 0;">' + (isTR ? 'Her makine için ünite sayısını ve Turning Bar seçeneklerini yapılandırın.' : 'Configure max units and Turning Bar options for each press.') + '</p>';
+      html += '</div>';
+      html += '<button class="btn-primary" style="gap:6px;display:flex;align-items:center;" onclick="openAddPressModal()" id="add-press-btn">+ ' + (isTR ? 'Yeni Makine' : 'New Press') + '</button>';
+      html += '</div>';
+
+      if (presses.length === 0) {
+        html += '<div style="text-align:center;padding:60px;background:var(--bg);border-radius:16px;border:1px dashed var(--border);">';
+        html += '<div style="font-size:40px;margin-bottom:12px;">🖨️</div>';
+        html += '<div style="font-size:15px;font-weight:600;margin-bottom:6px;">' + (isTR ? 'Henüz makine yok' : 'No presses configured') + '</div>';
+        html += '<div style="font-size:13px;color:var(--text-secondary);">' + (isTR ? 'Yukarıdaki butona tıklayın.' : 'Click the button above to add your first press.') + '</div>';
+        html += '</div>';
+      } else {
+        for (var i = 0; i < presses.length; i++) {
+          html += renderPressCard(presses[i], isTR);
+        }
+      }
+
+      // Add press modal (hidden)
+      html += renderAddPressModal(isTR);
+
+      html += '</div>';
+      document.getElementById('settings').innerHTML = html;
+    }
+
+    function renderPressCard(press, isTR) {
+      var tbOptions = press.turning_bar_options;
+      if (typeof tbOptions === 'string') { try { tbOptions = JSON.parse(tbOptions); } catch(e) { tbOptions = []; } }
+      tbOptions = tbOptions || [];
+
+      var html = '<div class="card" id="press-card-' + press.id + '" style="margin-bottom:20px;overflow:hidden;">';
+      html += '<div style="padding:16px 20px;border-bottom:0.5px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">';
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:18px;">🖨️</div>';
+      html += '<div>';
+      html += '<div style="font-size:15px;font-weight:700;letter-spacing:-0.02em;">' + escapeHtml(press.name || '') + '</div>';
+      html += '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHtml(press.machine || '') + '</div>';
+      html += '</div></div>';
+      html += '<div style="display:flex;gap:8px;">';
+      html += '<button class="btn-primary" onclick="savePress(' + press.id + ')" id="save-press-' + press.id + '" style="font-size:12px;padding:6px 14px;">' + (isTR ? 'Kaydet' : 'Save') + '</button>';
+      html += '<button class="btn-ghost" onclick="deletePress(' + press.id + ')" style="font-size:12px;padding:6px 14px;color:#c62828;">' + (isTR ? 'Sil' : 'Delete') + '</button>';
+      html += '</div></div>';
+
+      html += '<div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
+
+      // Column 1 — identity + units
+      html += '<div>';
+      html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">' + (isTR ? 'Temel Bilgiler' : 'Identity') + '</div>';
+      html += '<div class="field" style="margin-bottom:12px;"><label>' + (isTR ? 'Makine Adı' : 'Press Name') + '</label><input type="text" id="pc-name-' + press.id + '" value="' + escapeHtml(press.name || '') + '"></div>';
+      html += '<div class="field" style="margin-bottom:12px;"><label>' + (isTR ? 'Model' : 'Model') + '</label><input type="text" id="pc-machine-' + press.id + '" value="' + escapeHtml(press.machine || '') + '" placeholder="e.g. Cerutti R840"></div>';
+      html += '<div class="field" style="margin-bottom:0;"><label>' + (isTR ? 'Maksimum Ünite Sayısı' : 'Max Print Units') + '</label>';
+      html += '<div style="display:flex;align-items:center;border:0.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);">';
+      html += '<button class="btn-ghost" style="padding:8px 14px;font-size:18px;border-right:0.5px solid var(--border);border-radius:0;" type="button" onclick="adjustPcUnits(' + press.id + ',-1)">−</button>';
+      html += '<input type="number" id="pc-maxunits-' + press.id + '" value="' + (press.max_units || 8) + '" min="1" max="20" style="width:60px;text-align:center;font-size:18px;font-weight:700;border:none;background:transparent;padding:8px 0;">';
+      html += '<button class="btn-ghost" style="padding:8px 14px;font-size:18px;border-left:0.5px solid var(--border);border-radius:0;" type="button" onclick="adjustPcUnits(' + press.id + ',1)">+</button>';
+      html += '</div></div>';
+      html += '</div>';
+
+      // Column 2 — turning bar
+      html += '<div>';
+      html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">Turning Bar</div>';
+      html += '<div class="field" style="margin-bottom:12px;"><label>' + (isTR ? 'Ekstra Setup Süresi (Turning Bar)' : 'Extra Setup Time (Turning Bar)') + '</label>';
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<input type="number" id="pc-tbextra-' + press.id + '" value="' + (press.turning_bar_extra_min || 20) + '" min="0" max="120" style="width:80px;">';
+      html += '<span style="font-size:13px;color:var(--text-secondary);">' + (isTR ? 'dakika' : 'minutes') + '</span>';
+      html += '</div></div>';
+      html += '<div class="field" style="margin-bottom:0;">';
+      html += '<label>' + (isTR ? 'Turning Bar Konfigürasyonları' : 'Turning Bar Configurations') + '</label>';
+      html += '<div id="pc-tboptions-' + press.id + '" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
+      if (tbOptions.length === 0) {
+        html += '<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:4px 0;" id="pc-tbempty-' + press.id + '">' + (isTR ? 'Henüz seçenek yok' : 'No configurations yet') + '</div>';
+      } else {
+        for (var j = 0; j < tbOptions.length; j++) {
+          html += renderTbOptionRow(press.id, tbOptions[j], j);
+        }
+      }
+      html += '</div>';
+      html += '<button class="btn-ghost" style="width:100%;font-size:12px;" onclick="addTurningBarOption(' + press.id + ')">+ ' + (isTR ? 'Seçenek Ekle (z.B. 7+1)' : 'Add Option (e.g. 7+1)') + '</button>';
+      html += '</div>';
+      html += '</div>';
+
+      // Row 2 — production params
+      html += '</div>';
+      html += '<div style="padding:16px 20px;border-top:0.5px solid var(--border-subtle);background:rgba(0,0,0,0.015);display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">';
+      html += '<div class="field" style="margin:0;"><label style="font-size:10px;">' + (isTR ? 'Hedef Hız (m/dk)' : 'Target Speed (m/min)') + '</label><input type="number" id="pc-speed-' + press.id + '" value="' + (press.target_speed_m_min || 300) + '" min="0"></div>';
+      html += '<div class="field" style="margin:0;"><label style="font-size:10px;">' + (isTR ? 'Maks Makulatur %' : 'Max Waste %') + '</label><input type="number" id="pc-waste-' + press.id + '" value="' + (press.max_waste_percent || 3) + '" min="0" max="100"></div>';
+      html += '<div class="field" style="margin:0;"><label style="font-size:10px;">' + (isTR ? 'Kleberabfall (m)' : 'Splice Waste (m)') + '</label><input type="number" id="pc-splice-' + press.id + '" value="' + (press.splice_waste_m || 250) + '" min="0"></div>';
+      html += '</div>';
+
+      html += '</div>';
+      return html;
+    }
+
+    function renderTbOptionRow(pressId, val, idx) {
+      return '<div style="display:flex;align-items:center;gap:8px;" id="pc-tbrow-' + pressId + '-' + idx + '">' +
+        '<div style="background:var(--accent);color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;letter-spacing:0.02em;">' + escapeHtml(val) + '</div>' +
+        '<input type="text" value="' + escapeHtml(val) + '" id="pc-tbopt-' + pressId + '-' + idx + '" style="flex:1;font-size:13px;" placeholder="z.B. 7+1">' +
+        '<button class="btn-ghost" style="padding:4px 10px;font-size:12px;color:#c62828;" onclick="removeTurningBarOption(' + pressId + ',' + idx + ')">×</button>' +
+        '</div>';
+    }
+
+    function renderAddPressModal(isTR) {
+      return '<div id="add-press-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:none;align-items:center;justify-content:center;">' +
+        '<div class="modal" style="max-width:440px;">' +
+        '<div class="modal-head"><span class="modal-title">' + (isTR ? 'Yeni Makine' : 'New Press') + '</span><button class="modal-close" onclick="closeAddPressModal()">✕</button></div>' +
+        '<div class="modal-body">' +
+        '<div class="field"><label>' + (isTR ? 'Makine Adı *' : 'Press Name *') + '</label><input type="text" id="np-name" placeholder="e.g. Roto 4"></div>' +
+        '<div class="field"><label>' + (isTR ? 'Model' : 'Model') + '</label><input type="text" id="np-machine" placeholder="e.g. Cerutti R840"></div>' +
+        '<div class="field"><label>' + (isTR ? 'Maksimum Ünite' : 'Max Units') + '</label><input type="number" id="np-maxunits" value="8" min="1" max="20"></div>' +
+        '<div class="modal-actions"><button class="btn-ghost" onclick="closeAddPressModal()">' + (isTR ? 'İptal' : 'Cancel') + '</button><button class="btn-primary" onclick="submitNewPress()">' + (isTR ? 'Ekle' : 'Add Press') + '</button></div>' +
+        '</div></div></div>';
+    }
+
+    function openAddPressModal() {
+      var m = document.getElementById('add-press-modal');
+      if (m) { m.style.display = 'flex'; }
+    }
+    function closeAddPressModal() {
+      var m = document.getElementById('add-press-modal');
+      if (m) { m.style.display = 'none'; }
+    }
+
+    async function submitNewPress() {
+      var name = (document.getElementById('np-name') || {}).value || '';
+      var machine = (document.getElementById('np-machine') || {}).value || '';
+      var maxUnits = parseInt((document.getElementById('np-maxunits') || {}).value) || 8;
+      if (!name.trim()) { showToast('Press name required'); return; }
+      try {
+        var res = await fetch('/api/presses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), machine: machine.trim(), max_units: maxUnits }) });
+        var data = await res.json();
+        if (!res.ok) { showToast('Error: ' + (data.error || 'Unknown')); return; }
+        closeAddPressModal();
+        showToast('✓ Press added');
+        loadSettings();
+      } catch(e) { showToast('Error: ' + e.message); }
+    }
+
+    function adjustPcUnits(pressId, delta) {
+      var el = document.getElementById('pc-maxunits-' + pressId);
+      if (!el) return;
+      var v = parseInt(el.value) + delta;
+      el.value = Math.max(1, Math.min(20, v));
+    }
+
+    function addTurningBarOption(pressId) {
+      var container = document.getElementById('pc-tboptions-' + pressId);
+      if (!container) return;
+      var emptyDiv = document.getElementById('pc-tbempty-' + pressId);
+      if (emptyDiv) emptyDiv.remove();
+      var idx = container.querySelectorAll('[id^="pc-tbrow-' + pressId + '-"]').length;
+      var row = document.createElement('div');
+      row.innerHTML = renderTbOptionRow(pressId, '', idx);
+      container.appendChild(row.firstChild);
+    }
+
+    function removeTurningBarOption(pressId, idx) {
+      var el = document.getElementById('pc-tbrow-' + pressId + '-' + idx);
+      if (el) el.remove();
+    }
+
+    async function savePress(pressId) {
+      var name = (document.getElementById('pc-name-' + pressId) || {}).value || '';
+      var machine = (document.getElementById('pc-machine-' + pressId) || {}).value || '';
+      var maxUnits = parseInt((document.getElementById('pc-maxunits-' + pressId) || {}).value) || 8;
+      var tbExtra = parseInt((document.getElementById('pc-tbextra-' + pressId) || {}).value) || 20;
+      var speed = parseInt((document.getElementById('pc-speed-' + pressId) || {}).value) || 300;
+      var waste = parseInt((document.getElementById('pc-waste-' + pressId) || {}).value) || 3;
+      var splice = parseInt((document.getElementById('pc-splice-' + pressId) || {}).value) || 250;
+      // Collect turning bar options
+      var tbOptions = [];
+      var container = document.getElementById('pc-tboptions-' + pressId);
+      if (container) {
+        var inputs = container.querySelectorAll('input[type="text"]');
+        for (var i = 0; i < inputs.length; i++) {
+          var v = inputs[i].value.trim();
+          if (v) tbOptions.push(v);
+        }
+      }
+      var btn = document.getElementById('save-press-' + pressId);
+      if (btn) { btn.textContent = '...'; btn.disabled = true; }
+      try {
+        var res = await fetch('/api/presses/' + pressId, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, machine, max_units: maxUnits, turning_bar_options: tbOptions, turning_bar_extra_min: tbExtra, splice_waste_m: splice, target_speed_m_min: speed, max_waste_percent: waste })
+        });
+        var data = await res.json();
+        if (!res.ok) { showToast('Error: ' + (data.error || 'Unknown')); }
+        else {
+          showToast('✓ ' + name + ' saved');
+          // Update cache
+          if (window._pressesCache) {
+            var idx2 = window._pressesCache.findIndex(function(p) { return p.id == pressId; });
+            if (idx2 !== -1) { window._pressesCache[idx2].max_units = maxUnits; window._pressesCache[idx2].turning_bar_options = tbOptions; window._pressesCache[idx2].turning_bar_extra_min = tbExtra; }
+          }
+          loadSettings();
+        }
+      } catch(e) { showToast('Error: ' + e.message); }
+      if (btn) { btn.textContent = currentLang === 'tr' ? 'Kaydet' : 'Save'; btn.disabled = false; }
+    }
+
+    async function deletePress(pressId) {
+      if (!confirm(currentLang === 'tr' ? 'Bu makineyi silmek istediğinizden emin misiniz?' : 'Delete this press? This cannot be undone.')) return;
+      try {
+        var res = await fetch('/api/presses/' + pressId, { method: 'DELETE' });
+        var data = await res.json();
+        if (!res.ok) { showToast('Error: ' + (data.error || 'Unknown')); }
+        else { showToast('Press deleted'); loadSettings(); }
+      } catch(e) { showToast('Error: ' + e.message); }
+    }
+
     var chartInstance = null;
 
     function buildFilterBar() {
@@ -3249,7 +3570,9 @@ app.get('/api/migrate', async (c) => {
       { name: 'has_cmyk', type: 'INTEGER DEFAULT 1' },
       { name: 'has_varnish', type: 'INTEGER DEFAULT 0' },
       { name: 'print_units', type: 'INTEGER DEFAULT 0' },
-      { name: 'setup_target_min', type: 'INTEGER DEFAULT 0' }
+      { name: 'setup_target_min', type: 'INTEGER DEFAULT 0' },
+      { name: 'turningbar_used', type: 'INTEGER DEFAULT 0' },
+      { name: 'turningbar_config', type: 'TEXT' }
     ];
     for (const col of requiredJobCols) {
       if (!jobsColNames.includes(col.name)) {
@@ -3273,6 +3596,23 @@ app.get('/api/migrate', async (c) => {
         try { await db.prepare(`ALTER TABLE benchmarks ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
       }
     }
+
+    // Migrate presses table — add new configurator columns
+    try {
+      const pressMeta = await db.prepare(`PRAGMA table_info(presses)`).all();
+      const pressColNames = (pressMeta.results || []).map(r => r.name);
+      const requiredPressCols = [
+        { name: 'max_units', type: 'INTEGER DEFAULT 8' },
+        { name: 'turning_bar_options', type: "TEXT DEFAULT '[]'" },
+        { name: 'turning_bar_extra_min', type: 'INTEGER DEFAULT 20' }
+      ];
+      for (const col of requiredPressCols) {
+        if (!pressColNames.includes(col.name)) {
+          try { await db.prepare(`ALTER TABLE presses ADD COLUMN ${col.name} ${col.type}`).run(); } catch(e) {}
+        }
+      }
+    } catch(e) {}
+
     return c.json({ ok: true });
   } catch(e) {
     return c.json({ error: e.message }, 500);
@@ -3283,6 +3623,78 @@ app.get('/api/presses', async (c) => {
   const db = c.env.DB;
   const result = await db.prepare('SELECT * FROM presses ORDER BY sort_order').all();
   return c.json({ presses: result.results || [] });
+});
+
+// ── Press CRUD API ────────────────────────────────────────────────────────────
+app.post('/api/presses', async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const { name, machine, max_units, turning_bar_options, turning_bar_extra_min,
+          splice_waste_m, target_speed_m_min, max_waste_percent } = body;
+  if (!name) return c.json({ error: 'name required' }, 400);
+  try {
+    const result = await db.prepare(
+      `INSERT INTO presses (name, machine, max_units, turning_bar_options, turning_bar_extra_min, splice_waste_m, target_speed_m_min, max_waste_percent, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM presses))`
+    ).bind(name, machine || null, max_units || 8, JSON.stringify(turning_bar_options || []),
+      turning_bar_extra_min || 20, splice_waste_m || 250, target_speed_m_min || 300, max_waste_percent || 3).run();
+    return c.json({ ok: true, id: result.meta.last_row_id });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put('/api/presses/:id', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { name, machine, max_units, turning_bar_options, turning_bar_extra_min,
+          splice_waste_m, target_speed_m_min, max_waste_percent, sort_order } = body;
+  try {
+    await db.prepare(
+      `UPDATE presses SET
+        name = COALESCE(?, name),
+        machine = COALESCE(?, machine),
+        max_units = COALESCE(?, max_units),
+        turning_bar_options = COALESCE(?, turning_bar_options),
+        turning_bar_extra_min = COALESCE(?, turning_bar_extra_min),
+        splice_waste_m = COALESCE(?, splice_waste_m),
+        target_speed_m_min = COALESCE(?, target_speed_m_min),
+        max_waste_percent = COALESCE(?, max_waste_percent),
+        sort_order = COALESCE(?, sort_order)
+       WHERE id = ?`
+    ).bind(
+      name || null, machine || null,
+      max_units != null ? max_units : null,
+      turning_bar_options != null ? JSON.stringify(turning_bar_options) : null,
+      turning_bar_extra_min != null ? turning_bar_extra_min : null,
+      splice_waste_m != null ? splice_waste_m : null,
+      target_speed_m_min != null ? target_speed_m_min : null,
+      max_waste_percent != null ? max_waste_percent : null,
+      sort_order != null ? sort_order : null,
+      id
+    ).run();
+    return c.json({ ok: true });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete('/api/presses/:id', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  try {
+    const activeJobs = await db.prepare(
+      `SELECT COUNT(*) as cnt FROM jobs WHERE press_id = ? AND status IN ('active', 'setup', 'andruck')`
+    ).bind(id).first();
+    if (activeJobs && activeJobs.cnt > 0) {
+      return c.json({ error: 'Cannot delete press with active jobs' }, 409);
+    }
+    await db.prepare('DELETE FROM presses WHERE id = ?').bind(id).run();
+    return c.json({ ok: true });
+  } catch(e) {
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 app.get('/api/dashboard', async (c) => {
@@ -3306,9 +3718,10 @@ app.get('/api/dashboard', async (c) => {
     const result = await db.prepare(`
       SELECT
         p.id as press_id, p.name as press_name, p.machine as press_machine, p.max_colors, p.status as press_status, p.sort_order,
+        p.max_units, p.turning_bar_options, p.turning_bar_extra_min,
         j.id as job_id, j.job_number, j.job_title, j.print_method, j.color_count, j.status as job_status,
         j.setup_start_at, j.first_pull_at, j.prod_start_at, j.prev_units, j.curr_units, j.print_units, j.actual_stops, j.actual_waste, j.target_units,
-        j.setup_target_min,
+        j.setup_target_min, j.turningbar_used, j.turningbar_config,
         b.id as benchmark_id, b.color as color_name, b.color_hex, b.de, b.ds, b.delta_c, b.created_at as measured_at,
         b.sctv_5, b.sctv_10, b.sctv_25, b.sctv_50, b.sctv_75
       FROM presses p
@@ -3329,6 +3742,9 @@ app.get('/api/dashboard', async (c) => {
       if (!pressMap[pid]) {
         pressMap[pid] = {
           id: pid, name: r.press_name, machine: r.press_machine, max_colors: r.max_colors,
+          max_units: r.max_units || 8,
+          turning_bar_options: (() => { try { return JSON.parse(r.turning_bar_options || '[]'); } catch(e) { return []; } })(),
+          turning_bar_extra_min: r.turning_bar_extra_min || 20,
           status: r.press_status, sort_order: r.sort_order, _jobs: {}
         };
         pressOrder.push(pid);
@@ -3339,9 +3755,11 @@ app.get('/api/dashboard', async (c) => {
             id: r.job_id, job_number: r.job_number, job_title: r.job_title,
             print_method: r.print_method, color_count: r.color_count, status: r.job_status,
             setup_start_at: r.setup_start_at, first_pull_at: r.first_pull_at, prod_start_at: r.prod_start_at,
-            prev_units: r.prev_units, print_units: r.print_units, curr_units: r.curr_units, 
+            prev_units: r.prev_units, print_units: r.print_units, curr_units: r.curr_units,
             target_units: r.target_units, actual_stops: r.actual_stops,
-            actual_waste: r.actual_waste, setup_target_min: r.setup_target_min, measurements: []
+            actual_waste: r.actual_waste, setup_target_min: r.setup_target_min,
+            turningbar_used: r.turningbar_used || 0, turningbar_config: r.turningbar_config || null,
+            measurements: []
           };
         }
         if (r.color_name) {
@@ -3401,6 +3819,9 @@ app.get('/api/dashboard', async (c) => {
         name: press.name,
         machine: press.machine,
         max_colors: press.max_colors,
+        max_units: press.max_units || 8,
+        turning_bar_options: press.turning_bar_options || [],
+        turning_bar_extra_min: press.turning_bar_extra_min || 20,
         sort_order: press.sort_order,
         jobs: jobsArr
       });
@@ -3740,7 +4161,7 @@ app.post('/api/jobs', async (c) => {
   } catch(e) {}
 
   const body = await c.req.json();
-  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units: req_prev_units } = body;
+  const { job_number, job_title, print_method, color_count, press_id, target_units, colors, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units: req_prev_units, turningbar_used, turningbar_config } = body;
   if (!job_number || !job_title) return c.json({ error: 'job_number and job_title required' }, 400);
 
     try {
@@ -3758,12 +4179,20 @@ app.post('/api/jobs', async (c) => {
         await db.prepare('UPDATE jobs SET status = ? WHERE press_id = ? AND status IN ("active", "setup", "andruck")').bind('completed', press_id).run();
       }
 
-      // Backend calculation of target_min to ensure formula integrity: (Out * 1min) + (In * 2min)
-      const final_setup_target = (prev_units * 1) + ((print_units || 0) * 2);
+      // Backend calculation of target_min: (Out * 1min) + (In * 2min) + optional turningbar extra time
+      let turningBarExtraMin = 0;
+      if (turningbar_used) {
+        // Get press-specific extra time, fallback to 20
+        try {
+          const pressData = await db.prepare('SELECT turning_bar_extra_min FROM presses WHERE id = ?').bind(press_id).first();
+          turningBarExtraMin = pressData ? (pressData.turning_bar_extra_min || 20) : 20;
+        } catch(e) { turningBarExtraMin = 20; }
+      }
+      const final_setup_target = (prev_units * 1) + ((print_units || 0) * 2) + turningBarExtraMin;
 
       const result = await db.prepare(
-        `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, final_setup_target, prev_units).run();
+        `INSERT INTO jobs (job_number, job_title, print_method, color_count, press_id, target_units, job_state, has_white, has_cmyk, has_varnish, print_units, setup_target_min, prev_units, turningbar_used, turningbar_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(job_number, job_title, print_method || null, color_count || 0, press_id || null, target_units || 0, 'ready', has_white || 0, has_cmyk || 0, has_varnish || 0, print_units || 0, final_setup_target, prev_units, turningbar_used ? 1 : 0, turningbar_config || null).run();
 
     const newJobId = result.meta.last_row_id;
 
