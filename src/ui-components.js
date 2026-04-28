@@ -157,13 +157,18 @@ export const renderJobCard = `
         startTime = job.setup_start_at;
         timerPrefix = 'Setup: ';
         targetInfo = splitTargetInfo;
-        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
+        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck Başlat' : 'Start First Pull') + '</button>';
       } else if (status === 'andruck') {
         startTime = job.first_pull_at;
         timerPrefix = 'Andruck: ';
         targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Admin-Ziel: 10 Min</span>';
-        var setupModalTitle = isTR ? 'Kurulum Verileri' : 'Setup Metrics';
-        actionBtnHtml = '<button class="btn-action-main state-andruck" onclick="openMetricsModal(' + job.id + ', \\'' + setupModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'start-prod\\')">⚡ ' + (isTR ? 'Andruck Başlat' : 'Start First Pull') + '</button>';
+        var nextPullTitle = isTR ? 'Çekim Verileri' : 'Pull Metrics';
+        var prodTitle = isTR ? 'Üretimi Başlat' : 'Start Production';
+        
+        actionBtnHtml = '<div style="display:flex; gap:8px;">';
+        actionBtnHtml += '<button class="btn-action-sec state-andruck" style="flex:1;" onclick="openMetricsModal(' + job.id + ', \\'' + nextPullTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'\\')">↻ ' + (isTR ? 'Yeni Çekim' : 'Next Pull') + '</button>';
+        actionBtnHtml += '<button class="btn-action-main state-andruck" style="flex:1;" onclick="openMetricsModal(' + job.id + ', \\'' + prodTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'start-prod\\')">⚡ ' + (isTR ? 'Üretime Geç' : 'Start Prod') + '</button>';
+        actionBtnHtml += '</div>';
       } else if (status === 'active') {
         startTime = job.prod_start_at;
         timerPrefix = 'Prod: ';
