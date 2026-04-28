@@ -2249,7 +2249,9 @@ app.get('/', (c) => {
     }
 
     function adjustPrevUnits(delta) {
-      window._njPrevUnits = Math.max(0, (window._njPrevUnits || 0) + delta);
+      var maxUnits = parseInt((document.getElementById('nj-max-colors') || {}).value) || 8;
+      var newVal = Math.max(0, (window._njPrevUnits || 0) + delta);
+      window._njPrevUnits = Math.min(newVal, maxUnits);
       document.getElementById('nj-prev-units-display').textContent = window._njPrevUnits;
       updatePrintUnitDisplay();
     }
