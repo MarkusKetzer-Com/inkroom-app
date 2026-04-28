@@ -2001,17 +2001,11 @@ app.get('/', (c) => {
         // Only show the most recent (current) job
         var jobs = press.jobs || [];
         if (jobs.length === 0) {
-           // Case: No active job — still render the 6-tile grid with a "New Job" button in Tile 1
-           html += '<div class="cockpit-grid">';
-           html += '<div class="cockpit-tile">';
-           html += '<div class="tile-title"><span>📂</span>' + (currentLang === 'tr' ? 'İŞ BİLGİSİ' : 'JOB INFO') + '</div>';
-           html += '<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px 0;">';
-           html += '<span style="color:var(--text-tertiary); font-size:13px;">' + (currentLang === 'tr' ? 'Aktif iş yok' : 'No active job') + '</span>';
-           html += '<button class="btn-primary" style="width:100%;" onclick="openNewJobModal(' + press.id + ')">+ ' + (currentLang === 'tr' ? 'Yeni İş' : 'New Job') + '</button>';
-           html += '</div>';
-           html += '</div>';
-           // Add 5 placeholders to complete the grid
-           for(var i=0; i<5; i++) html += '<div class="cockpit-tile"><div class="tile-placeholder">Waiting for job...</div></div>';
+           // No active job — show add card full width
+           var addLabel = currentLang === 'tr' ? 'Yeni İş' : 'New Job';
+           html += '<div class="add-card" style="flex:1;max-width:none;min-height:200px;" onclick="openNewJobModal(' + press.id + ')">';
+           html += '<div class="add-icon-circle">+</div>';
+           html += '<span class="add-card-label">' + addLabel + '</span>';
            html += '</div>';
         } else {
           var job = jobs[0]; // current/latest job
