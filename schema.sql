@@ -48,3 +48,39 @@ CREATE TABLE benchmarks (
   edited_at TEXT,
   edited_from TEXT
 );
+
+CREATE TABLE presses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  press_name TEXT NOT NULL,
+  machine_model TEXT,
+  splice_waste_m INTEGER DEFAULT 250,
+  target_speed_m_min INTEGER DEFAULT 300,
+  max_waste_percent INTEGER DEFAULT 3
+);
+
+CREATE TABLE system_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pull_time_min INTEGER,
+  pull_waste_m INTEGER,
+  splice_waste_m INTEGER,
+  target_speed_m_min INTEGER,
+  max_waste_percent INTEGER
+);
+
+CREATE TABLE admin_pulls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id INTEGER NOT NULL,
+  pull_number INTEGER NOT NULL,
+  waste_m INTEGER DEFAULT 0,
+  de_cyan REAL,
+  de_magenta REAL,
+  de_yellow REAL,
+  de_black REAL,
+  de_spot1 REAL,
+  de_spot2 REAL,
+  de_spot3 REAL,
+  de_spot4 REAL,
+  de_spot5 REAL,
+  de_spot6 REAL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

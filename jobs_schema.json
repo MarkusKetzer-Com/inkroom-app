@@ -1,0 +1,27 @@
+[
+  {
+    "results": [
+      {
+        "sql": "CREATE TABLE jobs (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    job_number TEXT NOT NULL UNIQUE,\n    job_title TEXT NOT NULL,\n    print_method TEXT,\n    spot_colours INTEGER DEFAULT 0,\n    status TEXT DEFAULT 'active',\n    created_at TEXT DEFAULT (datetime('now')),\n    updated_at TEXT DEFAULT (datetime('now'))\n  , press_id INTEGER, setup_start_at TEXT, first_pull_at TEXT, prod_start_at TEXT, prev_units INTEGER DEFAULT 8, curr_units INTEGER DEFAULT 8, actual_stops INTEGER, actual_waste INTEGER, target_units INTEGER DEFAULT 0, job_state TEXT DEFAULT 'ready', production_start_at TEXT, completed_at TEXT, color_count INTEGER DEFAULT 0, has_white INTEGER DEFAULT 0, has_cmyk INTEGER DEFAULT 1, has_varnish INTEGER DEFAULT 0, print_units INTEGER DEFAULT 0, setup_target_min INTEGER DEFAULT 0, admin_pull_count INTEGER DEFAULT 0, admin_waste_m INTEGER DEFAULT 0, admin_out INTEGER DEFAULT 0, admin_done INTEGER DEFAULT 0, admin_start_at TEXT)"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "WEUR",
+      "served_by_colo": "CDG",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.2195
+      },
+      "duration": 0.2195,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 86016,
+      "rows_read": 12,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

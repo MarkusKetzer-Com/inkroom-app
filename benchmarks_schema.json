@@ -1,0 +1,27 @@
+[
+  {
+    "results": [
+      {
+        "sql": "CREATE TABLE benchmarks (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  date TEXT,\n  time TEXT,\n  machine TEXT,\n  product TEXT,\n  color TEXT,\n  de REAL,\n  ds INTEGER,\n  delta_c REAL,\n  status_en TEXT,\n  status_tr TEXT,\n  benchmark_en TEXT,\n  benchmark_tr TEXT,\n  diagnosis_en TEXT,\n  diagnosis_tr TEXT,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, process_type TEXT DEFAULT 'gravure', delta_h      REAL DEFAULT 0, delta_l      REAL DEFAULT 0, viscosity    REAL, print_speed  REAL, drying_temp  REAL, status TEXT DEFAULT 'active', supersedes_id INTEGER DEFAULT NULL, job_id INTEGER, color_hex TEXT, measurement_seq INTEGER DEFAULT 1, edited_at TEXT, edited_from TEXT, c_5 REAL, c_10 REAL, c_25 REAL, c_50 REAL, c_75 REAL, m_5 REAL, m_10 REAL, m_25 REAL, m_50 REAL, m_75 REAL, y_5 REAL, y_10 REAL, y_25 REAL, y_50 REAL, y_75 REAL, k_5 REAL, k_10 REAL, k_25 REAL, k_50 REAL, k_75 REAL, sctv_5 REAL, sctv_10 REAL, sctv_25 REAL, sctv_50 REAL, sctv_75 REAL)"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "WEUR",
+      "served_by_colo": "CDG",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.158
+      },
+      "duration": 0.158,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 86016,
+      "rows_read": 12,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

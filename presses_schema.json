@@ -1,0 +1,27 @@
+[
+  {
+    "results": [
+      {
+        "sql": "CREATE TABLE presses (\n      id INTEGER PRIMARY KEY AUTOINCREMENT,\n      name TEXT NOT NULL,\n      machine TEXT,\n      max_colors INTEGER DEFAULT 8,\n      status TEXT DEFAULT 'idle',\n      sort_order INTEGER DEFAULT 0\n    )"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "WEUR",
+      "served_by_colo": "CDG",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.093
+      },
+      "duration": 0.093,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 86016,
+      "rows_read": 12,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]
