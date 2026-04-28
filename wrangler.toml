@@ -1,4 +1,4 @@
-name = "inkroom-app"  # Dies ist dein Hauptprojekt
+name = "preview4-inkroom-app"  # Dies ist dein Hauptprojekt
 main = "src/index.js"
 compatibility_date = "2024-03-11"
 
