@@ -77,12 +77,12 @@ export const renderJobCard = `
           var pillTV = pillLabels[tierTV] ? (currentLang === 'tr' ? pillLabels[tierTV].tr : pillLabels[tierTV].en) : '-';
           var pillDE = pillLabels[tierDE] ? (currentLang === 'tr' ? pillLabels[tierDE].tr : pillLabels[tierDE].en) : '-';
 
-          var safeColorName = (c.color_name || '').replace(/'/g, "\\'");
-          var safeHex = (hex || '').replace(/'/g, "\\'");
+          var safeColorName = (c.color_name || '').replace(/'/g, "\\\\'");
+          var safeHex = (hex || '').replace(/'/g, "\\\\'");
           var sctvData = JSON.stringify({
             sctv_5: c.sctv_5, sctv_10: c.sctv_10, sctv_25: c.sctv_25, sctv_50: c.sctv_50, sctv_75: c.sctv_75
           }).replace(/"/g, '&quot;');
-          var clickAttr = jobId ? ' onclick="openCorrection(' + jobId + ", \'" + safeColorName + "\', \'" + safeHex + "\', \'" + sctvData + "\'" + ')" style="cursor:pointer;"' : '';
+          var clickAttr = jobId ? ' onclick="openCorrection(' + jobId + ", \\'" + safeColorName + "\\', \\'" + safeHex + "\\', \\'" + sctvData + "\\'" + ')" style="cursor:pointer;"' : '';
 
           return '<tr class="color-row-clickable"' + clickAttr + '>' +
             '<td><span class="' + swatchClass + '" style="background:' + hex + '"></span>' + escapeHtml(c.color_name || '-') + '</td>' +
@@ -151,26 +151,26 @@ export const renderJobCard = `
       var targetInfo = '';
 
       if (status === 'ready') {
-        actionBtnHtml = '<button class="btn-action-main" onclick="handleJobAction(' + job.id + ', \'start-setup\')">▶ ' + (isTR ? 'Setup Başlat' : 'Start Setup') + '</button>';
+        actionBtnHtml = '<button class="btn-action-main" onclick="handleJobAction(' + job.id + ', \\'start-setup\\')">▶ ' + (isTR ? 'Setup Başlat' : 'Start Setup') + '</button>';
         targetInfo = splitTargetInfo;
       } else if (status === 'setup') {
         startTime = job.setup_start_at;
         timerPrefix = 'Setup: ';
         targetInfo = splitTargetInfo;
-        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \'first-pull\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
+        actionBtnHtml = '<button class="btn-action-main state-setup" onclick="handleJobAction(' + job.id + ', \\'first-pull\\')">✓ ' + (isTR ? 'Andruck (İlk Çekim)' : 'First Pull') + '</button>';
       } else if (status === 'andruck') {
         startTime = job.first_pull_at;
         timerPrefix = 'Andruck: ';
         targetInfo = '<span style="font-size:11px;color:var(--text-secondary);margin-left:6px;">Admin-Ziel: 10 Min</span>';
         var setupModalTitle = isTR ? 'Kurulum Verileri' : 'Setup Metrics';
-        actionBtnHtml = '<button class="btn-action-main state-andruck" onclick="openMetricsModal(' + job.id + ', \'' + setupModalTitle + '\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \'start-prod\')">⚡ ' + (isTR ? 'Andruck Başlat' : 'Start First Pull') + '</button>';
+        actionBtnHtml = '<button class="btn-action-main state-andruck" onclick="openMetricsModal(' + job.id + ', \\'' + setupModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'start-prod\\')">⚡ ' + (isTR ? 'Andruck Başlat' : 'Start First Pull') + '</button>';
       } else if (status === 'active') {
         startTime = job.prod_start_at;
         timerPrefix = 'Prod: ';
         var prodModalTitle = isTR ? 'Üretim Verileri' : 'Production Metrics';
         var finishModalTitle = isTR ? 'İşi Bitir' : 'Finish Job';
-        actionBtnHtml = '<button class="btn-action-main state-active" onclick="openMetricsModal(' + job.id + ', \'' + prodModalTitle + '\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \'\')">📊 ' + (isTR ? 'Veri Gir' : 'Enter Metrics') + '</button>';
-        actionBtnHtml += '<button class="btn-action-sec" onclick="openMetricsModal(' + job.id + ', \'' + finishModalTitle + '\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \'complete\')">Finish</button>';
+        actionBtnHtml = '<button class="btn-action-main state-active" onclick="openMetricsModal(' + job.id + ', \\'' + prodModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'\\')">📊 ' + (isTR ? 'Veri Gir' : 'Enter Metrics') + '</button>';
+        actionBtnHtml += '<button class="btn-action-sec" onclick="openMetricsModal(' + job.id + ', \\'' + finishModalTitle + '\\', ' + unitsActual + ', ' + wasteTotal + ', ' + stopsTotal + ', \\'complete\\')">Finish</button>';
       }
 
       // ── Traffic-Light Badges (MECH / ADMIN / PROD) ────────────────────────
